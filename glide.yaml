@@ -1,0 +1,4 @@
+package: github.com/dmaier-couchbase/cb-openshift3/tools/couchbase_sidecar
+import:
+- package: github.com/Sirupsen/logrus
+  version: ~0.10.0
