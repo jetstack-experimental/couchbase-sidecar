@@ -8,12 +8,11 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/couchbase/go-couchbase"
 	"github.com/spf13/cobra"
 	kube "k8s.io/client-go/1.5/kubernetes"
 	kubeAPI "k8s.io/client-go/1.5/pkg/api/v1"
-	kubeREST "k8s.io/client-go/1.5/rest"
 )
 
 var AppVersion string = "unknown"
@@ -33,10 +32,12 @@ type CouchbaseSidecar struct {
 	PodName      string
 	PodNamespace string
 
-	// couchbase infors
-	couchbaseURL      string
-	couchbaseUsername string
-	couchbasePassword string
+	// couchbase infos
+	couchbaseClusterName string
+	couchbaseServices    []string
+	couchbaseURL         string
+	couchbaseUsername    string
+	couchbasePassword    string
 
 	// stop channel for shutting down
 	stopCh chan struct{}
@@ -52,6 +53,10 @@ func New() *CouchbaseSidecar {
 	}
 	cs.init()
 	return cs
+}
+
+func (cs *CouchbaseSidecar) Log() *logrus.Entry {
+	return logrus.WithField("context", "root")
 }
 
 func (cs *CouchbaseSidecar) userHomeDir() string {
@@ -70,21 +75,21 @@ func (cs *CouchbaseSidecar) connectCouchbase() error {
 	if err != nil {
 		return fmt.Errorf("Error connecting to local couchbase: %s", err)
 	}
-	log.Debugf("couchbase client=%+v", client)
+	cs.Log().Debugf("couchbase client=%+v", client)
 
 	pool, err := client.GetPool("default")
 	if err != nil {
 		return fmt.Errorf("Error getting default pool: %s", err)
 	}
-	log.Debugf("couchbase pool=%+v", pool)
+	cs.Log().Debugf("couchbase pool=%+v", pool)
 
 	return nil
 }
 
 func (cs *CouchbaseSidecar) init() {
 
-	log.SetOutput(os.Stderr)
-	log.SetLevel(log.DebugLevel)
+	logrus.SetOutput(os.Stderr)
+	logrus.SetLevel(logrus.DebugLevel)
 
 	cs.RootCmd = &cobra.Command{
 		Use:   AppName,
@@ -92,12 +97,12 @@ func (cs *CouchbaseSidecar) init() {
 		Run: func(cmd *cobra.Command, args []string) {
 			cs.readEnvironmentVariables()
 
-			log.Infof("Got pods info pod:=%#v", cs.Pod())
+			cs.Log().Infof("Got pods info pod:=%#v", cs.Pod())
 
 			for {
 				err := cs.connectCouchbase()
 				if err != nil {
-					log.Warnf("Error connecting couchbase: %s", err)
+					cs.Log().Warnf("Error connecting couchbase: %s", err)
 				}
 				time.Sleep(10 * time.Second)
 			}
@@ -138,33 +143,6 @@ func (cs *CouchbaseSidecar) readEnvironmentVariables() {
 	}
 
 	if len(missingEnv) > 0 {
-		log.Fatalf("Missing environment variable(s): %s", strings.Join(missingEnv, ", "))
+		cs.Log().Fatalf("Missing environment variable(s): %s", strings.Join(missingEnv, ", "))
 	}
-}
-
-func (cs *CouchbaseSidecar) KubernetesClientset() *kube.Clientset {
-	if cs.kubernetesClientset == nil {
-		config, err := kubeREST.InClusterConfig()
-		if err != nil {
-			log.Fatalf("Error creating kubernetes in cluster config: %s", err)
-		}
-		// creates the clientset
-		cs.kubernetesClientset, err = kube.NewForConfig(config)
-		if err != nil {
-			log.Fatalf("Error creating kubernetes clientset: %s", err)
-		}
-	}
-
-	return cs.kubernetesClientset
-}
-
-func (cs *CouchbaseSidecar) Pod() *kubeAPI.Pod {
-	if cs.pod == nil {
-		pod, err := cs.KubernetesClientset().Core().Pods(cs.PodNamespace).Get(cs.PodName)
-		if err != nil {
-			log.Fatalf("Cannot find my own pod: %s", err)
-		}
-		cs.pod = pod
-	}
-	return cs.pod
 }
