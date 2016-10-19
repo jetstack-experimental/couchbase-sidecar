@@ -17,6 +17,8 @@ type Couchbase struct {
 	Password string
 }
 
+var ErrorNodeUninitialized error = fmt.Errorf("Node uninitialized")
+
 func New(rawURL string) (*Couchbase, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -79,16 +81,26 @@ func (c *Couchbase) CheckStatusCode(resp *http.Response, validStatusCodes []int)
 }
 
 func (c *Couchbase) Connect() error {
-	// verify auth is enabled
-	err := c.ensureAuthEnabled()
+	// connect without auth
+	resp, err := c.Request("GET", "/pools/default", nil, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("Error while connecting: %s", err)
 	}
 
-	// configure username, password for url
-	c.URL.User = url.UserPassword(c.Username, c.Password)
+	// connect with auth
+	if resp.StatusCode == 401 {
+		c.URL.User = url.UserPassword(c.Username, c.Password)
+		resp, err = c.Request("GET", "/pools/default", nil, nil)
+		if err != nil {
+			return fmt.Errorf("Error while connecting: %s", err)
+		}
+	}
 
-	return c.Ping()
+	// uninitialized
+	if resp.StatusCode == 404 {
+		return ErrorNodeUninitialized
+	}
+	return c.CheckStatusCode(resp, []int{200})
 }
 
 func (c *Couchbase) Port() int {
@@ -97,8 +109,8 @@ func (c *Couchbase) Port() int {
 }
 
 func (c *Couchbase) UpdateServices(services []string) error {
-	data := make(url.Values)
-	data.Set("key", strings.Join(services, ","))
+	data := url.Values{}
+	data.Set("services", strings.Join(services, ","))
 	resp, err := c.PostForm("/node/controller/setupServices", data)
 	if err != nil {
 		return err
@@ -115,7 +127,7 @@ func (c *Couchbase) UpdateMemoryIndexQuota(quota int) error {
 }
 
 func (c *Couchbase) UpdateMemoryQuota(key string, quota int) error {
-	data := make(url.Values)
+	data := url.Values{}
 	data.Set(key, fmt.Sprintf("%d", quota))
 	resp, err := c.PostForm("/pools/default", data)
 	if err != nil {
@@ -132,14 +144,14 @@ func (c *Couchbase) Ping() error {
 	return c.CheckStatusCode(resp, []int{200})
 }
 
-func (c *Couchbase) ensureAuthEnabled() error {
+func (c *Couchbase) SetupAuth() error {
 	resp, err := c.Request("GET", "/settings/web", nil, nil)
 	if err != nil {
 		return fmt.Errorf("Error while checking login: %s", err)
 	}
 
 	if resp.StatusCode == 200 {
-		data := make(url.Values)
+		data := url.Values{}
 		data.Set("username", c.Username)
 		data.Set("password", c.Password)
 		data.Set("port", fmt.Sprintf("%d", c.Port()))

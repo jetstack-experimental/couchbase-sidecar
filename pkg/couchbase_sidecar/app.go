@@ -3,9 +3,12 @@ package couchbase_sidecar
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -21,35 +24,53 @@ var AppGitState string = "unknown"
 var AppName string = "couchbase-sidecar"
 var AppDesc string = "manage couchbase instance in kubernetes"
 
+type CouchbaseConfig struct {
+	URL              string
+	Username         string
+	Password         string
+	QueryMemoryLimit int
+	IndexMemoryLimit int
+	DataMemoryLimit  int
+	Name             string
+	Services         []string
+}
+
 type CouchbaseSidecar struct {
 	RootCmd             *cobra.Command
 	kubernetesClientset *kube.Clientset
 	Kubeconfig          string
 	resyncPeriod        time.Duration
 
+	// sub services
+	master      *master
+	healthCheck *healthCheck
+	monitor     *monitor
+
 	// my pods representation
 	pod          *kubeAPI.Pod
 	PodName      string
 	PodNamespace string
+	configMap    *kubeAPI.ConfigMap
 
-	// couchbase infos
-	couchbaseClusterName string
-	couchbaseServices    []string
-	couchbaseURL         string
-	couchbaseUsername    string
-	couchbasePassword    string
+	couchbaseConfig CouchbaseConfig
 
 	// stop channel for shutting down
 	stopCh chan struct{}
+
+	// wait group
+	waitGroup sync.WaitGroup
 }
 
 func New() *CouchbaseSidecar {
 	cs := &CouchbaseSidecar{
-		resyncPeriod:      5 * time.Minute,
-		stopCh:            make(chan struct{}),
-		couchbaseURL:      "http://127.0.0.1:8091",
-		couchbaseUsername: "admin",
-		couchbasePassword: "jetstack",
+		resyncPeriod: 5 * time.Minute,
+		stopCh:       make(chan struct{}),
+		waitGroup:    sync.WaitGroup{},
+		couchbaseConfig: CouchbaseConfig{
+			URL:      "http://127.0.0.1:8091",
+			Username: "admin",
+			Password: "jetstack",
+		},
 	}
 	cs.init()
 	return cs
@@ -71,7 +92,7 @@ func (cs *CouchbaseSidecar) userHomeDir() string {
 }
 
 func (cs *CouchbaseSidecar) connectCouchbase() error {
-	client, err := couchbase.Connect(cs.couchbaseURL)
+	client, err := couchbase.Connect(cs.couchbaseConfig.URL)
 	if err != nil {
 		return fmt.Errorf("Error connecting to local couchbase: %s", err)
 	}
@@ -95,16 +116,10 @@ func (cs *CouchbaseSidecar) init() {
 		Use:   AppName,
 		Short: AppDesc,
 		Run: func(cmd *cobra.Command, args []string) {
-			cs.readEnvironmentVariables()
 
-			cs.Log().Infof("Got pods info pod:=%#v", cs.Pod())
-
-			for {
-				err := cs.connectCouchbase()
-				if err != nil {
-					cs.Log().Warnf("Error connecting couchbase: %s", err)
-				}
-				time.Sleep(10 * time.Second)
+			err := cs.run()
+			if err != nil {
+				cs.Log().Fatalf("Error initializing side car", err)
 			}
 		},
 	}
@@ -127,7 +142,39 @@ func (cs *CouchbaseSidecar) init() {
 	cs.RootCmd.AddCommand(versionCmd)
 }
 
-func (cs *CouchbaseSidecar) readEnvironmentVariables() {
+func (cs *CouchbaseSidecar) run() error {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		cs.Stop()
+	}()
+
+	err := cs.readEnvironmentVariables()
+	if err != nil {
+		return err
+	}
+
+	err = cs.readLabels()
+	if err != nil {
+		return err
+	}
+
+	err = cs.readConfigMap()
+	if err != nil {
+		return err
+	}
+
+	cs.startMaster()
+	cs.startMonitor()
+	cs.startHealthCheck()
+
+	cs.waitGroup.Wait()
+
+	return nil
+}
+
+func (cs *CouchbaseSidecar) readEnvironmentVariables() error {
 
 	cs.PodName = os.Getenv("POD_NAME")
 	cs.PodNamespace = os.Getenv("POD_NAMESPACE")
@@ -143,6 +190,41 @@ func (cs *CouchbaseSidecar) readEnvironmentVariables() {
 	}
 
 	if len(missingEnv) > 0 {
-		cs.Log().Fatalf("Missing environment variable(s): %s", strings.Join(missingEnv, ", "))
+		return fmt.Errorf("Missing environment variable(s): %s", strings.Join(missingEnv, ", "))
 	}
+
+	return nil
+}
+
+func (cs *CouchbaseSidecar) Stop() {
+	cs.Log().Info("shuting things down")
+	close(cs.stopCh)
+}
+
+func (cs *CouchbaseSidecar) startMaster() {
+	cs.Log().Infof("test")
+	cs.master = &master{cs: cs}
+	cs.waitGroup.Add(1)
+	go func() {
+		defer cs.waitGroup.Done()
+		cs.master.run()
+	}()
+}
+
+func (cs *CouchbaseSidecar) startMonitor() {
+	cs.monitor = &monitor{cs: cs}
+	cs.waitGroup.Add(1)
+	go func() {
+		defer cs.waitGroup.Done()
+		cs.monitor.run()
+	}()
+}
+
+func (cs *CouchbaseSidecar) startHealthCheck() {
+	cs.healthCheck = &healthCheck{cs: cs}
+	cs.waitGroup.Add(1)
+	go func() {
+		defer cs.waitGroup.Done()
+		cs.healthCheck.run()
+	}()
 }
