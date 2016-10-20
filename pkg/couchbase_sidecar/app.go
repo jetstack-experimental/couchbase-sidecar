@@ -50,6 +50,7 @@ type CouchbaseSidecar struct {
 	pod          *kubeAPI.Pod
 	PodName      string
 	PodNamespace string
+	serviceName  *string
 	configMap    *kubeAPI.ConfigMap
 
 	couchbaseConfig CouchbaseConfig

@@ -50,6 +50,8 @@ func (cs *CouchbaseSidecar) ConfigMap() *kubeAPI.ConfigMap {
 
 func (cs *CouchbaseSidecar) Master() bool {
 	// TODO: Master election, currently master hardcoded to first pod in data petset
+	// Has to be data node
+	// TODO: Do that: http://k8s.io/kubernetes/pkg/client/leaderelection
 	return fmt.Sprintf("%s-data-0", cs.couchbaseConfig.Name) == cs.PodName
 }
 
@@ -72,9 +74,14 @@ func (cs *CouchbaseSidecar) readLabels() error {
 		return fmt.Errorf("pod label 'type' is not specifying the services of this node")
 	}
 
-	for _, service := range strings.Split(strings.ToLower(types), ",") {
+	var mainType string
+
+	for i, service := range strings.Split(strings.ToLower(types), ",") {
 		name, ok := servicesMap[service]
 		if ok {
+			if i == 0 {
+				mainType = service
+			}
 			services = append(services, name)
 		}
 	}
@@ -90,6 +97,9 @@ func (cs *CouchbaseSidecar) readLabels() error {
 		return fmt.Errorf("pod label 'name' is not specifying the cluster name")
 	}
 	cs.couchbaseConfig.Name = strings.ToLower(clusterName)
+
+	serviceName := fmt.Sprintf("%s-%s", cs.couchbaseConfig.Name, mainType)
+	cs.serviceName = &serviceName
 
 	return nil
 }
@@ -142,4 +152,23 @@ func (cs *CouchbaseSidecar) readConfigMap() error {
 
 	// TODO: read bucket names / sample data
 	return nil
+}
+
+func (cs *CouchbaseSidecar) couchbaseClusterURL() (string, error) {
+	service, err := cs.KubernetesClientset().Core().Services(cs.PodNamespace).Get(cs.couchbaseConfig.Name)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("http://%s:8091", service.Spec.ClusterIP), nil
+}
+
+func (cs *CouchbaseSidecar) NodeName() string {
+	if cs.serviceName == nil {
+		return cs.Pod().Status.PodIP
+	}
+	return fmt.Sprintf("%s.%s.%s", cs.PodName, *cs.serviceName, cs.DNSSuffix())
+}
+
+func (cs *CouchbaseSidecar) DNSSuffix() string {
+	return fmt.Sprintf("%s.svc.cluster.local", cs.PodNamespace)
 }

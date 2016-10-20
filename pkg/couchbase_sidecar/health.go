@@ -28,8 +28,9 @@ func (m *healthCheck) mux() *http.ServeMux {
 
 	mux.HandleFunc("/_status/ready", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain")
-		err := fmt.Errorf("not ready go away")
-		if err == nil {
+
+		err := m.cs.CouchbaseLocalHealthy()
+		if m.cs.Master() || err != nil {
 			w.WriteHeader(http.StatusOK)
 			m.Log().Debugf("Health check: ok")
 			fmt.Fprint(w, "ok")

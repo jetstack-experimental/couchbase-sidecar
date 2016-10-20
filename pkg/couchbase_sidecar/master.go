@@ -20,10 +20,8 @@ func (m *master) run() {
 		for {
 			if m.cs.Master() {
 				m.Log().Info("I am master, doing master things")
-				err := m.cs.InitialiseCluster()
-				m.Log().Infof("Initalise cluster: %s", err)
-			} else {
-				m.Log().Debug("I am slave, doing nothing")
+				//err := m.cs.InitialiseCluster()
+				//m.Log().Infof("Initalise cluster: %s", err)
 			}
 			time.Sleep(10 * time.Second)
 		}
