@@ -98,8 +98,11 @@ func (cs *CouchbaseSidecar) readLabels() error {
 	}
 	cs.couchbaseConfig.Name = strings.ToLower(clusterName)
 
-	serviceName := fmt.Sprintf("%s-%s", cs.couchbaseConfig.Name, mainType)
-	cs.serviceName = &serviceName
+	// TODO: detect the service name throught the PetSet variable
+	if mainType != "query" {
+		serviceName := fmt.Sprintf("%s-%s", cs.couchbaseConfig.Name, mainType)
+		cs.serviceName = &serviceName
+	}
 
 	return nil
 }
@@ -162,9 +165,14 @@ func (cs *CouchbaseSidecar) couchbaseClusterURL() (string, error) {
 	return fmt.Sprintf("http://%s:8091", service.Spec.ClusterIP), nil
 }
 
+func (cs *CouchbaseSidecar) IsPetSet() (bool, error) {
+	return true, nil
+}
+
 func (cs *CouchbaseSidecar) NodeName() string {
+	cs.Log().Debugf("POD: %#v", cs.Pod().GetOwnerReferences())
 	if cs.serviceName == nil {
-		return cs.Pod().Status.PodIP
+		return cs.PodIP
 	}
 	return fmt.Sprintf("%s.%s.%s", cs.PodName, *cs.serviceName, cs.DNSSuffix())
 }

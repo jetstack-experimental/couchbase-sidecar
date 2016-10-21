@@ -30,7 +30,7 @@ func (m *healthCheck) mux() *http.ServeMux {
 		w.Header().Set("Content-Type", "text/plain")
 
 		err := m.cs.CouchbaseLocalHealthy()
-		if m.cs.Master() || err != nil {
+		if m.cs.Master() || err == nil {
 			w.WriteHeader(http.StatusOK)
 			m.Log().Debugf("Health check: ok")
 			fmt.Fprint(w, "ok")

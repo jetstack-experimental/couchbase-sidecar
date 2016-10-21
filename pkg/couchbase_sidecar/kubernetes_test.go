@@ -60,7 +60,7 @@ func TestReadLabels(t *testing.T) {
 		t.Errorf("unexpected couchbaseClusterName '%s', expected '%s'", got, expected)
 	}
 
-	if expected, got := []string{"data"}, s.couchbaseConfig.Services; !reflect.DeepEqual(expected, got) {
+	if expected, got := []string{"kv"}, s.couchbaseConfig.Services; !reflect.DeepEqual(expected, got) {
 		t.Errorf("unexpected couchbaseServices '%+v', expected '%+v'", got, expected)
 	}
 
@@ -79,7 +79,7 @@ func TestReadLabels(t *testing.T) {
 		t.Errorf("unexpected couchbaseClusterName '%s', expected '%s'", got, expected)
 	}
 
-	if expected, got := []string{"data"}, s.couchbaseConfig.Services; !reflect.DeepEqual(expected, got) {
+	if expected, got := []string{"kv"}, s.couchbaseConfig.Services; !reflect.DeepEqual(expected, got) {
 		t.Errorf("unexpected couchbaseServices '%+v', expected '%+v'", got, expected)
 	}
 
@@ -93,7 +93,7 @@ func TestReadLabels(t *testing.T) {
 	}
 
 	{
-		expected, got := []string{"data", "query"}, s.couchbaseConfig.Services
+		expected, got := []string{"kv", "n1ql"}, s.couchbaseConfig.Services
 		sort.Strings(expected)
 		sort.Strings(got)
 

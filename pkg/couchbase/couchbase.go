@@ -16,19 +16,32 @@ type Couchbase struct {
 	URL      *url.URL
 	Username string
 	Password string
+	info     *Node
+	cluster  *Cluster
 }
 
 type Node struct {
 	Uptime               string   `json:"uptime,omitempty"`
 	CouchApiBase         string   `json:"couchApiBase,omitempty"`
 	ClusterMembership    string   `json:"clusterMembership,omitempty"`
+	ClusterCompatibility int      `json:"clusterCompatibility,omitempty"`
 	Status               string   `json:"status,omitempty"`
 	ThisNode             bool     `json:"thisNode,omitempty"`
 	Hostname             string   `json:"hostname,omitempty"`
-	ClusterCompatibility int      `json:"clusterCompatibility,omitempty"`
 	Version              string   `json:"version,omitempty"`
 	OS                   string   `json:"os,omitempty"`
 	Services             []string `json:"services,omitempty"`
+	IndexMemoryQuota     int      `json:"indexMemoryQuota,omitempty"`
+	MemoryQuota          int      `json:"memoryQuota,omitempty"`
+	RebalanceStatus      string   `json:"rebalanceStatus,omitempty"`
+	OTPCookie            string   `json:"otpNode,omitempty"`
+	OTPNode              string   `json:"otpNode,omitempty"`
+}
+
+type Cluster struct {
+	IsAdminCreds bool   `json:"isAdminCreds,omitempty"`
+	IsEnterprise bool   `json:"isEnterprise,omitempty"`
+	UUID         string `json:"uuid,omitempty"`
 }
 
 type Pool struct {
@@ -160,13 +173,18 @@ func (c *Couchbase) getInfo(nodes []Node) (*Node, error) {
 }
 
 func (c *Couchbase) Info() (*Node, error) {
-	nodes, err := c.Nodes()
-	if err != nil {
-		return nil, err
+	if c.info == nil {
+		nodes, err := c.Nodes()
+		if err != nil {
+			return nil, err
+		}
+		info, err := c.getInfo(nodes)
+		if err != nil {
+			return nil, err
+		}
+		c.info = info
 	}
-
-	return c.getInfo(nodes)
-
+	return c.info, nil
 }
 
 func (c *Couchbase) Port() int {
@@ -185,15 +203,81 @@ func (c *Couchbase) UpdateServices(services []string) error {
 	return c.CheckStatusCode(resp, []int{200})
 }
 
-func (c *Couchbase) UpdateMemoryDataQuota(quota int) error {
-	return c.UpdateMemoryQuota("memoryQuota", quota)
+func (c *Couchbase) EnsureMemoryQuota(dataQuota int, indexQuota int) error {
+	info, err := c.Info()
+	if err != nil {
+		return err
+	}
+
+	if info.MemoryQuota != dataQuota {
+		err := c.updateMemoryQuota("memoryQuota", dataQuota)
+		if err != nil {
+			return err
+		}
+		c.info = nil
+	}
+
+	if info.IndexMemoryQuota != indexQuota {
+		err := c.updateMemoryQuota("indexMemoryQuota", indexQuota)
+		if err != nil {
+			return err
+		}
+		c.info = nil
+	}
+
+	return nil
 }
 
-func (c *Couchbase) UpdateMemoryIndexQuota(quota int) error {
-	return c.UpdateMemoryQuota("indexMemoryQuota", quota)
+func (c *Couchbase) ClusterID() (string, error) {
+	cluster, err := c.Cluster()
+	if err != nil {
+		return "", err
+	}
+	return cluster.UUID, nil
 }
 
-func (c *Couchbase) UpdateMemoryQuota(key string, quota int) error {
+func (c *Couchbase) RebalanceStatus() (string, error) {
+	c.info = nil
+	info, err := c.Info()
+	if err != nil {
+		return "", err
+	}
+	return info.RebalanceStatus, nil
+}
+
+func (c *Couchbase) Cluster() (*Cluster, error) {
+	if c.cluster == nil {
+		resp, err := c.Request("GET", "/pools/default", nil, nil)
+		if err != nil {
+			return nil, fmt.Errorf("Error while connecting: %s", err)
+		}
+
+		err = c.CheckStatusCode(resp, []int{200})
+		if err != nil {
+			return nil, err
+		}
+
+		defer resp.Body.Close()
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		// parse json
+		cluster := Cluster{}
+		err = json.Unmarshal(body, &cluster)
+		if err != nil {
+			return nil, err
+		}
+		c.cluster = &cluster
+	}
+
+	return c.cluster, nil
+
+}
+
+func (c *Couchbase) updateMemoryQuota(key string, quota int) error {
+	c.Log().Debugf("update quota %s to %d", key, quota)
 	data := url.Values{}
 	data.Set(key, fmt.Sprintf("%d", quota))
 	resp, err := c.PostForm("/pools/default", data)

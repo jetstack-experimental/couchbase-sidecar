@@ -50,6 +50,7 @@ type CouchbaseSidecar struct {
 	pod          *kubeAPI.Pod
 	PodName      string
 	PodNamespace string
+	PodIP        string
 	serviceName  *string
 	configMap    *kubeAPI.ConfigMap
 
@@ -179,6 +180,7 @@ func (cs *CouchbaseSidecar) readEnvironmentVariables() error {
 
 	cs.PodName = os.Getenv("POD_NAME")
 	cs.PodNamespace = os.Getenv("POD_NAMESPACE")
+	cs.PodIP = os.Getenv("POD_IP")
 
 	missingEnv := []string{}
 
@@ -188,6 +190,10 @@ func (cs *CouchbaseSidecar) readEnvironmentVariables() error {
 
 	if cs.PodNamespace == "" {
 		missingEnv = append(missingEnv, "POD_NAMESPACE")
+	}
+
+	if cs.PodIP == "" {
+		missingEnv = append(missingEnv, "POD_IP")
 	}
 
 	if len(missingEnv) > 0 {
