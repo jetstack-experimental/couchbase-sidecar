@@ -1,6 +1,7 @@
 package couchbase_sidecar
 
 import (
+	"fmt"
 	"reflect"
 	"sort"
 	"time"
@@ -45,12 +46,24 @@ func (m *master) periodicCheck() error {
 		m.Log().Warnf("checking for rebalance operation failed: %s", err)
 	}
 
+	err = m.checkClusterID()
+	if err != nil {
+		m.Log().Warnf("checking cluster ID failed: %s", err)
+	}
+
 	return nil
 }
 
 func (m *master) checkRebalance() error {
 
 	// TODO: check if a rebalance is currently in progress
+	rebalanceState, err := m.cLocal.RebalanceStatus()
+	if err != nil {
+		return err
+	}
+	if rebalanceState != couchbase.RebalanceStatusNotRunning {
+		return fmt.Errorf("cannot rebalance, as another rebalance is already running: %s", rebalanceState)
+	}
 
 	// check if nodes needs rebalancing
 	nodes, err := m.cLocal.Nodes()

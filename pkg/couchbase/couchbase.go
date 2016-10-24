@@ -38,6 +38,8 @@ type Node struct {
 	OTPNode              string   `json:"otpNode,omitempty"`
 }
 
+const RebalanceStatusNotRunning string = ""
+
 type Cluster struct {
 	IsAdminCreds bool   `json:"isAdminCreds,omitempty"`
 	IsEnterprise bool   `json:"isEnterprise,omitempty"`
