@@ -1,6 +1,8 @@
 package couchbase_sidecar
 
 import (
+	"reflect"
+	"sort"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -9,8 +11,10 @@ import (
 )
 
 type master struct {
-	cs     *CouchbaseSidecar
-	cLocal *couchbase.Couchbase
+	cs                       *CouchbaseSidecar
+	cLocal                   *couchbase.Couchbase
+	nodesInactiveAdded       []string
+	nodesInactiveAddedUpdate time.Time
 }
 
 func (m *master) Log() *logrus.Entry {
@@ -36,12 +40,54 @@ func (m *master) periodicCheck() error {
 		m.Log().Warnf("checking memory quota failed: %s", err)
 	}
 
+	err = m.checkRebalance()
+	if err != nil {
+		m.Log().Warnf("checking for rebalance operation failed: %s", err)
+	}
+
 	return nil
 }
 
 func (m *master) checkRebalance() error {
-	// TODO: Implement me
+
+	// TODO: check if a rebalance is currently in progress
+
+	// check if nodes needs rebalancing
+	nodes, err := m.cLocal.Nodes()
+	if err != nil {
+		return err
+	}
+	nodesInactiveAdded := []string{}
+	nodesActive := []string{}
+	for _, node := range nodes {
+		if node.ClusterMembership == "inactiveAdded" {
+			nodesInactiveAdded = append(nodesInactiveAdded, node.OTPNode)
+		}
+		if node.ClusterMembership == "active" {
+			nodesActive = append(nodesActive, node.OTPNode)
+		}
+	}
+
+	sort.Strings(nodesInactiveAdded)
+	if !reflect.DeepEqual(nodesInactiveAdded, m.nodesInactiveAdded) {
+		m.nodesInactiveAdded = nodesInactiveAdded
+		m.nodesInactiveAddedUpdate = time.Now()
+	}
+
+	// no new node added for more than 30 secs
+	if len(m.nodesInactiveAdded) > 0 && (time.Now().Sub(m.nodesInactiveAddedUpdate) > (time.Second * 30)) {
+		knownNodes := []string{}
+		knownNodes = append(knownNodes, nodesActive...)
+		knownNodes = append(knownNodes, nodesInactiveAdded...)
+		err := m.cLocal.Rebalance(knownNodes, []string{})
+		if err != nil {
+			return err
+		}
+		m.nodesInactiveAdded = []string{}
+	}
+
 	return nil
+
 }
 
 func (m *master) checkMemory() error {

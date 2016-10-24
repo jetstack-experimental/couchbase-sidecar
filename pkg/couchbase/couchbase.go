@@ -34,7 +34,7 @@ type Node struct {
 	IndexMemoryQuota     int      `json:"indexMemoryQuota,omitempty"`
 	MemoryQuota          int      `json:"memoryQuota,omitempty"`
 	RebalanceStatus      string   `json:"rebalanceStatus,omitempty"`
-	OTPCookie            string   `json:"otpNode,omitempty"`
+	OTPCookie            string   `json:"otpCookie,omitempty"`
 	OTPNode              string   `json:"otpNode,omitempty"`
 }
 
@@ -234,6 +234,18 @@ func (c *Couchbase) ClusterID() (string, error) {
 		return "", err
 	}
 	return cluster.UUID, nil
+}
+
+func (c *Couchbase) Rebalance(knownNodes, ejectedNodes []string) error {
+	c.Log().Debugf("rebalance nodes ejected=%+v known=%+v", ejectedNodes, knownNodes)
+	data := url.Values{}
+	data.Set("ejecedNodes", strings.Join(ejectedNodes, ","))
+	data.Set("knownNodes", strings.Join(knownNodes, ","))
+	resp, err := c.PostForm("/controller/rebalance", data)
+	if err != nil {
+		return err
+	}
+	return c.CheckStatusCode(resp, []int{200})
 }
 
 func (c *Couchbase) RebalanceStatus() (string, error) {
