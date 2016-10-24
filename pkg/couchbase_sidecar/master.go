@@ -101,8 +101,13 @@ func (m *master) checkMemory() error {
 }
 
 func (m *master) checkClusterID() error {
-	// TODO: Implement me
-	return nil
+
+	clusterID, err := m.cLocal.ClusterID()
+	if err != nil {
+		return err
+	}
+
+	return m.cs.UpdateClusterID(clusterID)
 }
 
 func (m *master) run() {

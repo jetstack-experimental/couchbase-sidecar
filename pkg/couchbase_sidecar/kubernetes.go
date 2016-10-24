@@ -10,6 +10,8 @@ import (
 	kubeREST "k8s.io/client-go/1.5/rest"
 )
 
+const ConfigMapClusterID string = "couchbase.cluster-id"
+
 func (cs *CouchbaseSidecar) KubernetesClientset() *kube.Clientset {
 	if cs.kubernetesClientset == nil {
 		config, err := kubeREST.InClusterConfig()
@@ -179,4 +181,27 @@ func (cs *CouchbaseSidecar) NodeName() string {
 
 func (cs *CouchbaseSidecar) DNSSuffix() string {
 	return fmt.Sprintf("%s.svc.cluster.local", cs.PodNamespace)
+}
+
+func (cs *CouchbaseSidecar) UpdateClusterID(clusterID string) error {
+	client := cs.KubernetesClientset().Core().ConfigMaps(cs.PodNamespace)
+
+	cm, err := client.Get(cs.couchbaseConfig.Name)
+	if err != nil {
+		return err
+	}
+
+	cs.Log().Warnf("setting clusterID %s", clusterID)
+
+	if val, ok := cm.Data[ConfigMapClusterID]; ok {
+		if val == clusterID {
+			return nil
+		} else if val != "" {
+			return fmt.Errorf("Cluster ID already set to: '%s'", val)
+		}
+	}
+
+	cm.Data[ConfigMapClusterID] = clusterID
+	_, err = client.Update(cm)
+	return err
 }
