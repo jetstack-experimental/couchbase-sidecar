@@ -74,7 +74,9 @@ func (m *monitor) run() {
 	go func() {
 		for {
 			err := m.checkNode()
-			m.Log().Warnf("problem checking node: %s", err)
+			if err != nil {
+				m.Log().Warnf("problem checking node: %s", err)
+			}
 			time.Sleep(10 * time.Second)
 		}
 	}()
