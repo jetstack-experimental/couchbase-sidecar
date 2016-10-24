@@ -191,8 +191,6 @@ func (cs *CouchbaseSidecar) UpdateClusterID(clusterID string) error {
 		return err
 	}
 
-	cs.Log().Warnf("setting clusterID %s", clusterID)
-
 	if val, ok := cm.Data[ConfigMapClusterID]; ok {
 		if val == clusterID {
 			return nil

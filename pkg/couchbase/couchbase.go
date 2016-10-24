@@ -261,7 +261,7 @@ func (c *Couchbase) RebalanceStatus() (string, error) {
 
 func (c *Couchbase) Cluster() (*Cluster, error) {
 	if c.cluster == nil {
-		resp, err := c.Request("GET", "/pools/default", nil, nil)
+		resp, err := c.Request("GET", "/pools", nil, nil)
 		if err != nil {
 			return nil, fmt.Errorf("Error while connecting: %s", err)
 		}
