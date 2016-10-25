@@ -63,6 +63,28 @@ func New(rawURL string) (*Couchbase, error) {
 }
 
 func (c *Couchbase) Request(method, path string, body io.Reader, header *http.Header) (resp *http.Response, err error) {
+
+	resp, err = c.request(method, path, body, header)
+	if err != nil {
+		return nil, fmt.Errorf("Error while connecting: %s", err)
+	}
+
+	// connect with auth
+	if resp.StatusCode == 401 {
+		c.URL.User = url.UserPassword(c.Username, c.Password)
+		resp, err = c.request(method, path, body, header)
+		if err != nil {
+			return nil, fmt.Errorf("Error while connecting with auth: %s", err)
+		}
+		if resp.StatusCode == 401 {
+			return nil, fmt.Errorf("Error authenticating. Check user/password")
+		}
+	}
+
+	return resp, nil
+}
+
+func (c *Couchbase) request(method, path string, body io.Reader, header *http.Header) (resp *http.Response, err error) {
 	client := &http.Client{}
 
 	url := *c.URL
@@ -128,15 +150,6 @@ func (c *Couchbase) Nodes() (nodes []Node, err error) {
 	resp, err := c.Request("GET", "/pools/default", nil, nil)
 	if err != nil {
 		return nodes, fmt.Errorf("Error while connecting: %s", err)
-	}
-
-	// connect with auth
-	if resp.StatusCode == 401 {
-		c.URL.User = url.UserPassword(c.Username, c.Password)
-		resp, err = c.Request("GET", "/pools/default", nil, nil)
-		if err != nil {
-			return nodes, fmt.Errorf("Error while connecting: %s", err)
-		}
 	}
 
 	// uninitialized
@@ -344,7 +357,7 @@ func (c *Couchbase) SetupAuth() error {
 			return err
 		}
 	} else if resp.StatusCode != 401 {
-		return fmt.Errorf("Expected couchbase to respon with either 401 or 200")
+		return fmt.Errorf("Expected couchbase to respond with either 401 or 200")
 	}
 
 	return nil
