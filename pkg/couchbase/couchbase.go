@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/Sirupsen/logrus"
@@ -202,9 +203,17 @@ func (c *Couchbase) Info() (*Node, error) {
 	return c.info, nil
 }
 
-func (c *Couchbase) Port() int {
-	// TODO implement me
-	return 8091
+func (c *Couchbase) Port() uint16 {
+	hostParts := strings.Split(c.URL.Host, ":")
+	if len(hostParts) < 2 {
+		return uint16(80)
+	}
+
+	port, err := strconv.ParseInt(hostParts[len(hostParts)-1], 10, 16)
+	if err != nil {
+		return uint16(80)
+	}
+	return uint16(port)
 }
 
 func (c *Couchbase) UpdateServices(services []string) error {
