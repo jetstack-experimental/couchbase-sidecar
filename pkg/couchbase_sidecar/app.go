@@ -135,13 +135,30 @@ func (cs *CouchbaseSidecar) init() {
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
-		Short: fmt.Sprintf("Print the version number of %s", AppVersion),
+		Short: fmt.Sprintf("Print the version number of %s", AppName),
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("%s version %s git-commit=%s git-state=%s\n", AppName, AppVersion, AppGitCommit, AppGitState)
 		},
 	}
-
 	cs.RootCmd.AddCommand(versionCmd)
+
+	stopCmd := &cobra.Command{
+		Use:   "stop",
+		Short: "Asking sidecar to stop database application",
+		Run: func(cmd *cobra.Command, args []string) {
+			cs.Log().Infof("asking sidecar to stop")
+			client, err := cs.RPCClient()
+			if err != nil {
+				cs.Log().Fatal("dialing:", err)
+			}
+
+			err = client.Call("App.Hook", "stop", nil)
+			if err != nil {
+				cs.Log().Fatal("sidecar stop error:", err)
+			}
+		},
+	}
+	cs.RootCmd.AddCommand(stopCmd)
 }
 
 func (cs *CouchbaseSidecar) run() error {

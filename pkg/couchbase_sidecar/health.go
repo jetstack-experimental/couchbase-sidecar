@@ -8,6 +8,8 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+var AppListenPort int = 8080
+
 type healthCheck struct {
 	cs *CouchbaseSidecar
 }
@@ -41,12 +43,14 @@ func (m *healthCheck) mux() *http.ServeMux {
 		}
 	})
 
+	mux.Handle(AppRPCPath, m.newRPC())
+
 	return mux
 }
 
 func (m *healthCheck) run() {
 
-	port := fmt.Sprintf(":%d", 8080)
+	port := fmt.Sprintf(":%d", AppListenPort)
 
 	// listen on port
 	listener, err := net.Listen("tcp", port)
