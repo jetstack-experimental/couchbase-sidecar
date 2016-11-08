@@ -59,21 +59,29 @@ type CouchbaseSidecar struct {
 	// stop channel for shutting down
 	stopCh chan struct{}
 
-	// wait group
-	waitGroup sync.WaitGroup
+	// wait groups
+	waitGroupWorkers sync.WaitGroup
+
+	// graceful stop
+	waitGroupStopHookReceived sync.WaitGroup
+	waitGroupStopHookFinished sync.WaitGroup
+	waitGroupStopHookOnce     sync.Once
 }
 
 func New() *CouchbaseSidecar {
 	cs := &CouchbaseSidecar{
-		resyncPeriod: 5 * time.Minute,
-		stopCh:       make(chan struct{}),
-		waitGroup:    sync.WaitGroup{},
+		resyncPeriod:              5 * time.Minute,
+		stopCh:                    make(chan struct{}),
+		waitGroupWorkers:          sync.WaitGroup{},
+		waitGroupStopHookReceived: sync.WaitGroup{},
+		waitGroupStopHookFinished: sync.WaitGroup{},
 		couchbaseConfig: CouchbaseConfig{
 			URL:      "http://127.0.0.1:8091",
 			Username: "admin",
 			Password: "jetstack",
 		},
 	}
+	cs.waitGroupStopHookReceived.Add(2)
 	cs.init()
 	return cs
 }
@@ -188,7 +196,8 @@ func (cs *CouchbaseSidecar) run() error {
 	cs.startMonitor()
 	cs.startHealthCheck()
 
-	cs.waitGroup.Wait()
+	cs.waitGroupWorkers.Wait()
+	cs.waitGroupStopHookFinished.Wait()
 
 	return nil
 }
@@ -228,27 +237,27 @@ func (cs *CouchbaseSidecar) Stop() {
 func (cs *CouchbaseSidecar) startMaster() {
 	cs.Log().Infof("test")
 	cs.master = &master{cs: cs}
-	cs.waitGroup.Add(1)
+	cs.waitGroupWorkers.Add(1)
 	go func() {
-		defer cs.waitGroup.Done()
+		defer cs.waitGroupWorkers.Done()
 		cs.master.run()
 	}()
 }
 
 func (cs *CouchbaseSidecar) startMonitor() {
 	cs.monitor = &monitor{cs: cs}
-	cs.waitGroup.Add(1)
+	cs.waitGroupWorkers.Add(1)
 	go func() {
-		defer cs.waitGroup.Done()
+		defer cs.waitGroupWorkers.Done()
 		cs.monitor.run()
 	}()
 }
 
 func (cs *CouchbaseSidecar) startHealthCheck() {
 	cs.healthCheck = &healthCheck{cs: cs}
-	cs.waitGroup.Add(1)
+	cs.waitGroupWorkers.Add(1)
 	go func() {
-		defer cs.waitGroup.Done()
+		defer cs.waitGroupWorkers.Done()
 		cs.healthCheck.run()
 	}()
 }

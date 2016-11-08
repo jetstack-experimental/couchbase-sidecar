@@ -19,10 +19,12 @@ func (a *AppRPC) log() *logrus.Entry {
 }
 
 func (a *AppRPC) Hook(name string, result *bool) error {
-	a.log().Infof("Received '%s' hook, waiting 10 secs", name)
-	time.Sleep(10 * time.Second)
-	a.log().Infof("Goodbye hook")
-	return nil
+	a.log().Debugf("received '%s' hook", name)
+	if name == "stop" {
+		return a.cs.StopHook()
+	}
+
+	return fmt.Errorf("Unknown hook name '%s'", name)
 }
 
 func (m *healthCheck) newRPC() *rpc.Server {
@@ -36,4 +38,29 @@ func (m *healthCheck) newRPC() *rpc.Server {
 
 func (cs *CouchbaseSidecar) RPCClient() (*rpc.Client, error) {
 	return rpc.DialHTTPPath("tcp", fmt.Sprintf("127.0.0.1:%d", AppListenPort), AppRPCPath)
+}
+
+func (cs *CouchbaseSidecar) StopHook() error {
+
+	// make sure stop hook has been received twice
+	cs.waitGroupStopHookReceived.Done()
+	cs.waitGroupStopHookReceived.Wait()
+
+	// stop all other threads
+	cs.waitGroupStopHookOnce.Do(func() {
+		cs.Log().Infof("received stop hook, shutdown worker routines")
+		cs.waitGroupStopHookFinished.Add(1)
+		go func() {
+			defer cs.waitGroupStopHookFinished.Done()
+			cs.Stop()
+			cs.waitGroupWorkers.Wait()
+
+			// TODO: implement cluster removal
+			time.Sleep(10 * time.Second)
+			cs.Log().Infof("goodbye from the hook")
+		}()
+	})
+
+	cs.waitGroupStopHookFinished.Wait()
+	return nil
 }
