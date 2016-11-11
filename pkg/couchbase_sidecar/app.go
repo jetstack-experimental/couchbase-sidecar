@@ -293,7 +293,6 @@ func (cs *CouchbaseSidecar) Stop() {
 }
 
 func (cs *CouchbaseSidecar) startMaster() {
-	cs.Log().Infof("test")
 	cs.master = &master{cs: cs}
 	cs.waitGroupWorkers.Add(1)
 	go func() {

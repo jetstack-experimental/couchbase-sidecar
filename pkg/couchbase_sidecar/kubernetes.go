@@ -172,7 +172,6 @@ func (cs *CouchbaseSidecar) IsPetSet() (bool, error) {
 }
 
 func (cs *CouchbaseSidecar) NodeName() string {
-	cs.Log().Debugf("POD: %#v", cs.Pod().GetOwnerReferences())
 	if cs.serviceName == nil {
 		return cs.PodIP
 	}
