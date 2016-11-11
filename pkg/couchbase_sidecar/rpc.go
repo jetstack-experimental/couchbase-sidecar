@@ -40,6 +40,48 @@ func (cs *CouchbaseSidecar) RPCClient() (*rpc.Client, error) {
 	return rpc.DialHTTPPath("tcp", fmt.Sprintf("127.0.0.1:%d", AppListenPort), AppRPCPath)
 }
 
+func (cs *CouchbaseSidecar) RemoveMyself() error {
+	c, err := cs.CouchbaseLocal()
+	if err != nil {
+		return err
+	}
+
+	localNode, err := c.Info()
+	if err != nil {
+		return err
+	}
+
+	nodesAll, err := c.Nodes()
+	if err != nil {
+		return err
+	}
+
+	nodesKnown := []string{}
+	for _, node := range nodesAll {
+		if node.ClusterMembership == "active" && node.OTPNode != localNode.OTPNode {
+			nodesKnown = append(nodesKnown, node.OTPNode)
+		}
+	}
+
+	err = c.Rebalance(nodesKnown, []string{localNode.OTPNode})
+	if err != nil {
+		return err
+	}
+
+	for {
+		resp, err := c.Request("GET", "/pools/default", nil, nil)
+		if err != nil {
+			cs.Log().Warnf("Error while connecting: %s", err)
+		}
+		if resp.StatusCode == 404 {
+			break
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return nil
+}
+
 func (cs *CouchbaseSidecar) StopHook() error {
 
 	// make sure stop hook has been received twice
@@ -55,8 +97,15 @@ func (cs *CouchbaseSidecar) StopHook() error {
 			cs.Stop()
 			cs.waitGroupWorkers.Wait()
 
-			// TODO: implement cluster removal
-			time.Sleep(10 * time.Second)
+			for {
+				err := cs.RemoveMyself()
+				if err == nil {
+					break
+				}
+				cs.Log().Warnf("Removing node failed: %s", err)
+				time.Sleep(5 * time.Second)
+			}
+
 			cs.Log().Infof("goodbye from the hook")
 		}()
 	})
