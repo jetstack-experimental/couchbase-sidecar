@@ -2,6 +2,7 @@ package couchbase_sidecar
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -169,12 +170,69 @@ func (cs *CouchbaseSidecar) init() {
 	cs.RootCmd.AddCommand(stopCmd)
 }
 
+func (cs *CouchbaseSidecar) copyMyself() error {
+
+	destPath := "/sidecar"
+	_, err := os.Stat(destPath)
+	if err != nil {
+		return err
+	}
+
+	sourcePath, err := os.Readlink("/proc/self/exe")
+	if err != nil {
+		return err
+	}
+	basename := filepath.Base(sourcePath)
+
+	destPath = filepath.Join(destPath, basename)
+
+	cs.Log().Debugf("copy myself from '%s' to '%s'", sourcePath, destPath)
+	sourceFile, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	sourceFileStat, err := sourceFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	if !sourceFileStat.Mode().IsRegular() {
+		fmt.Errorf("%s is not a regular file", sourceFile)
+	}
+
+	destFile, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return err
+	}
+
+	return os.Chmod(destPath, 0755)
+
+}
+
 func (cs *CouchbaseSidecar) run() error {
 	c := make(chan os.Signal, 2)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
 		<-c
 		cs.Stop()
+	}()
+
+	// copy myself to folder
+	cs.waitGroupWorkers.Add(1)
+	go func() {
+		defer cs.waitGroupWorkers.Done()
+		err := cs.copyMyself()
+		if err != nil {
+			cs.Log().Warnf("Failed to provide binary to main container: %s", err)
+		}
 	}()
 
 	err := cs.readEnvironmentVariables()
