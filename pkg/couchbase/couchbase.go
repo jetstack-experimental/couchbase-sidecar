@@ -263,7 +263,7 @@ func (c *Couchbase) ClusterID() (string, error) {
 func (c *Couchbase) Rebalance(knownNodes, ejectedNodes []string) error {
 	c.Log().Debugf("rebalance nodes ejected=%+v known=%+v", ejectedNodes, knownNodes)
 	data := url.Values{}
-	data.Set("ejecedNodes", strings.Join(ejectedNodes, ","))
+	data.Set("ejectedNodes", strings.Join(ejectedNodes, ","))
 	data.Set("knownNodes", strings.Join(knownNodes, ","))
 	resp, err := c.PostForm("/controller/rebalance", data)
 	if err != nil {
