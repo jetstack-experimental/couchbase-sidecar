@@ -15,6 +15,9 @@ push: image
 	docker push $(IMAGE_NAME):latest
 	docker push $(IMAGE_NAME):$(APP_VERSION)
 
+push_minikube: image
+	docker save $(IMAGE_NAME):$(APP_VERSION) | minikube ssh -- docker load
+
 #codegen:
 #	mockgen -package=mocks -source=pkg/interfaces/interfaces.go > pkg/mocks/mocks.go
 
