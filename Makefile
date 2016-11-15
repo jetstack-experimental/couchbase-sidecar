@@ -1,10 +1,11 @@
 IMAGE_NAME:=jetstackexperimental/couchbase-sidecar
 APP_NAME:=couchbase-sidecar
+BUILD_DATE := $(shell date +%FT%T%z)
 build: version
 	CGO_ENABLED=0 GOOS=linux go build \
 		-a -tags netgo \
 		-o couchbase-sidecar \
-		-ldflags "-X couchbase_sidecar.AppGitState=${GIT_STATE} -X couchbase_sidecar.AppGitCommit=${GIT_COMMIT} -X couchbase_sidecar.AppVersion=${APP_VERSION}"
+		-ldflags "-X main.AppGitState=${GIT_STATE} -X main.AppGitCommit=${GIT_COMMIT} -X main.AppVersion=${APP_VERSION} -X main.AppBuildDate=${BUILD_DATE}"
 
 image: build
 	docker build -t $(IMAGE_NAME):latest .

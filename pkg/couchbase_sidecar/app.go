@@ -19,12 +19,6 @@ import (
 	kubeAPI "k8s.io/client-go/1.5/pkg/api/v1"
 )
 
-var AppVersion string = "unknown"
-var AppGitCommit string = "unknown"
-var AppGitState string = "unknown"
-var AppName string = "couchbase-sidecar"
-var AppDesc string = "manage couchbase instance in kubernetes"
-
 type CouchbaseConfig struct {
 	URL              string
 	Username         string
@@ -37,7 +31,12 @@ type CouchbaseConfig struct {
 }
 
 type CouchbaseSidecar struct {
-	RootCmd             *cobra.Command
+	AppName       string
+	AppDesc       string
+	Version       string
+	VersionDetail string
+	RootCmd       *cobra.Command
+
 	kubernetesClientset *kube.Clientset
 	Kubeconfig          string
 	resyncPeriod        time.Duration
@@ -124,8 +123,8 @@ func (cs *CouchbaseSidecar) init() {
 	logrus.SetLevel(logrus.DebugLevel)
 
 	cs.RootCmd = &cobra.Command{
-		Use:   AppName,
-		Short: AppDesc,
+		Use:   cs.AppName,
+		Short: cs.AppDesc,
 		Run: func(cmd *cobra.Command, args []string) {
 
 			err := cs.run()
@@ -144,9 +143,9 @@ func (cs *CouchbaseSidecar) init() {
 
 	versionCmd := &cobra.Command{
 		Use:   "version",
-		Short: fmt.Sprintf("Print the version number of %s", AppName),
+		Short: fmt.Sprintf("Print the version number of %s", cs.AppName),
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("%s version %s git-commit=%s git-state=%s\n", AppName, AppVersion, AppGitCommit, AppGitState)
+			fmt.Printf("%s version %s %s\n", cs.AppName, cs.Version, cs.VersionDetail)
 		},
 	}
 	cs.RootCmd.AddCommand(versionCmd)
