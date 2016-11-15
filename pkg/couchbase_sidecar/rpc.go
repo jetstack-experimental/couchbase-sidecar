@@ -41,45 +41,22 @@ func (cs *CouchbaseSidecar) RPCClient() (*rpc.Client, error) {
 }
 
 func (cs *CouchbaseSidecar) RemoveMyself() error {
-	c, err := cs.CouchbaseLocal()
+	cLocal, err := cs.CouchbaseLocal()
 	if err != nil {
 		return err
 	}
 
-	localNode, err := c.Info()
+	localNode, err := cLocal.Info()
 	if err != nil {
 		return err
 	}
 
-	nodesAll, err := c.Nodes()
+	cCluster, err := cs.CouchbaseCluster()
 	if err != nil {
 		return err
 	}
 
-	nodesKnown := []string{}
-	for _, node := range nodesAll {
-		if node.ClusterMembership == "active" && node.OTPNode != localNode.OTPNode {
-			nodesKnown = append(nodesKnown, node.OTPNode)
-		}
-	}
-
-	err = c.Rebalance(nodesKnown, []string{localNode.OTPNode})
-	if err != nil {
-		return err
-	}
-
-	for {
-		resp, err := c.Request("GET", "/pools/default", nil, nil)
-		if err != nil {
-			cs.Log().Warnf("Error while connecting: %s", err)
-		}
-		if resp.StatusCode == 404 {
-			break
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
-
-	return nil
+	return cCluster.RemoveNodes([]string{localNode.Hostname})
 }
 
 func (cs *CouchbaseSidecar) StopHook() error {

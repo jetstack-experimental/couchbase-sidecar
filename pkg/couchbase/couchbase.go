@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -39,7 +40,11 @@ type Node struct {
 	OTPNode              string   `json:"otpNode,omitempty"`
 }
 
-const RebalanceStatusNotRunning string = ""
+const RebalanceStatusNotRunning string = "running"
+const RebalanceStatusRunning string = "notRunning"
+const RebalanceStatusStale string = "stale"
+
+var ErrorNodeUninitialized error = fmt.Errorf("Node uninitialized")
 
 type Cluster struct {
 	IsAdminCreds bool   `json:"isAdminCreds,omitempty"`
@@ -50,8 +55,6 @@ type Cluster struct {
 type Pool struct {
 	Nodes []Node `json:"nodes,omitempty"`
 }
-
-var ErrorNodeUninitialized error = fmt.Errorf("Node uninitialized")
 
 func New(rawURL string) (*Couchbase, error) {
 	u, err := url.Parse(rawURL)
@@ -85,6 +88,15 @@ func (c *Couchbase) Request(method, path string, body io.Reader, header *http.He
 	return resp, nil
 }
 
+func strSliceContains(slice []string, item string) bool {
+	for _, elem := range slice {
+		if item == elem {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Couchbase) request(method, path string, body io.Reader, header *http.Header) (resp *http.Response, err error) {
 	client := &http.Client{}
 
@@ -106,6 +118,78 @@ func (c *Couchbase) PostForm(path string, data url.Values) (resp *http.Response,
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/x-www-form-urlencoded")
 	return c.Request("POST", path, strings.NewReader(data.Encode()), &headers)
+
+}
+
+func (c *Couchbase) RemoveNodes(removeNodes []string) error {
+	ejectNodes, _, _, allNodes, err := c.GetOTPNodes(removeNodes, []string{}, []string{})
+	if err != nil {
+		return err
+	}
+
+	if len(ejectNodes) != len(removeNodes) {
+		return fmt.Errorf("Some nodes specified to be removed are not part of the cluster")
+	}
+
+	err = c.Rebalance(allNodes, ejectNodes)
+	if err != nil {
+		return err
+	}
+
+	for {
+		status, err := c.RebalanceStatus()
+		if err != nil {
+			c.Log().Warnf("Error while checking rebalance status: %s", err)
+			continue
+		}
+		c.Log().Infof("Rebalance status: '%+v'", status)
+
+		nodes, err := c.Nodes()
+		if err != nil {
+			c.Log().Warnf("Error while listing nodes: %s", err)
+			continue
+		}
+
+		allRemoved := true
+		for _, node := range nodes {
+			if strSliceContains(removeNodes, node.Hostname) {
+				allRemoved = true
+				break
+			}
+		}
+
+		if allRemoved {
+			break
+		}
+
+		// TODO: Really sleep?
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return nil
+
+}
+
+func (c *Couchbase) GetOTPNodes(ejectNodes, failoverNode, reAddNode []string) (outEjectNodes, outFailoverNodes, outReAddNodes, outAllNodes []string, err error) {
+
+	nodes, err := c.Nodes()
+	if err != nil {
+		return
+	}
+
+	for _, node := range nodes {
+		if node.OTPNode == "" {
+			err = fmt.Errorf("Unable to get OTP name for %+v", node)
+			return
+		}
+		outAllNodes = append(outAllNodes, node.OTPNode)
+
+		if strSliceContains(ejectNodes, node.Hostname) {
+			outEjectNodes = append(outEjectNodes, node.OTPNode)
+		}
+	}
+
+	return outEjectNodes, outFailoverNodes, outReAddNodes, outAllNodes, nil
 }
 
 func (c *Couchbase) CheckStatusCode(resp *http.Response, validStatusCodes []int) error {
@@ -137,11 +221,7 @@ func (c *Couchbase) CheckStatusCode(resp *http.Response, validStatusCodes []int)
 }
 
 func (c *Couchbase) Connect() error {
-	info, err := c.Info()
-	if err != nil {
-		return err
-	}
-	c.Log().Debug("node infos: %+v", info)
+	_, err := c.Info()
 	return err
 }
 
@@ -278,6 +358,9 @@ func (c *Couchbase) RebalanceStatus() (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if info.RebalanceStatus == "" {
+		info.RebalanceStatus = RebalanceStatusNotRunning
+	}
 	return info.RebalanceStatus, nil
 }
 
@@ -388,11 +471,17 @@ func (c *Couchbase) Initialize(hostname string, services []string) error {
 
 func (c *Couchbase) AddNode(nodeName, username, password string, services []string) error {
 	data := url.Values{}
-	data.Set("services", strings.Join(services, ","))
 	data.Set("hostname", nodeName)
 	data.Set("user", username)
 	data.Set("password", password)
 	data.Set("services", strings.Join(services, ","))
+	c.Log().Debugf(
+		"adding node hostname='%s' username='%s' password='%s' services='%s'",
+		nodeName,
+		username,
+		password,
+		strings.Join(services, ","),
+	)
 	resp, err := c.PostForm("/controller/addNode", data)
 	if err != nil {
 		return err
