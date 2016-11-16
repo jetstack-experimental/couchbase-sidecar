@@ -1,6 +1,7 @@
 package couchbase
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -66,9 +67,9 @@ func New(rawURL string) (*Couchbase, error) {
 	}, nil
 }
 
-func (c *Couchbase) Request(method, path string, body io.Reader, header *http.Header) (resp *http.Response, err error) {
+func (c *Couchbase) Request(method, path string, body []byte, header *http.Header) (resp *http.Response, err error) {
 
-	resp, err = c.request(method, path, body, header)
+	resp, err = c.request(method, path, bytes.NewReader(body), header)
 	if err != nil {
 		return nil, fmt.Errorf("Error while connecting: %s", err)
 	}
@@ -76,7 +77,7 @@ func (c *Couchbase) Request(method, path string, body io.Reader, header *http.He
 	// connect with auth
 	if resp.StatusCode == 401 {
 		c.URL.User = url.UserPassword(c.Username, c.Password)
-		resp, err = c.request(method, path, body, header)
+		resp, err = c.request(method, path, bytes.NewReader(body), header)
 		if err != nil {
 			return nil, fmt.Errorf("Error while connecting with auth: %s", err)
 		}
@@ -117,8 +118,7 @@ func (c *Couchbase) request(method, path string, body io.Reader, header *http.He
 func (c *Couchbase) PostForm(path string, data url.Values) (resp *http.Response, err error) {
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/x-www-form-urlencoded")
-	return c.Request("POST", path, strings.NewReader(data.Encode()), &headers)
-
+	return c.Request("POST", path, []byte(data.Encode()), &headers)
 }
 
 func (c *Couchbase) RemoveNodes(removeNodes []string) error {
