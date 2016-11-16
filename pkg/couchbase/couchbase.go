@@ -132,29 +132,46 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 		return err
 	}
 
+	var sleep time.Duration = 0
 	for {
+		time.Sleep(sleep)
+
 		status, err := c.RebalanceStatus()
 		if err != nil {
+			sleep = 500 * time.Millisecond
 			c.Log().Warnf("Error while checking rebalance status: %s", err)
 			continue
 		}
+		sleep = time.Duration(int64(status.RecommendedRefreshPeriod * float64(time.Second)))
 
-		if !status.Running {
-			c.Log().Infof("rebalance finished")
-			break
-		}
-
+		nodeInRebalance := false
 		for _, node := range ejectNodes {
 			if strSliceContains(status.Nodes, node) {
-				continue
+				nodeInRebalance = true
 			}
 		}
 
-		c.Log().Infof("rebalance finished")
-		break
+		if nodeInRebalance {
+			continue
+		}
 
-		// TODO: Really sleep?
-		time.Sleep(500 * time.Millisecond)
+		nodes, err := c.Nodes()
+		if err != nil {
+			c.Log().Warnf("Error while getting nodes: %s", err)
+			continue
+		}
+
+		nodeInCluster := false
+		for _, node := range nodes {
+			if strSliceContains(ejectNodes, node.OTPNode) {
+				nodeInCluster = true
+			}
+		}
+		if nodeInCluster {
+			continue
+		}
+
+		c.Log().Infof("rebalance finished")
 	}
 
 	return nil

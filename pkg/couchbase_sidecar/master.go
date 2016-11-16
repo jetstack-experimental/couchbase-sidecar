@@ -61,7 +61,7 @@ func (m *master) checkRebalance() error {
 	if err != nil {
 		return err
 	}
-	if rebalanceState != couchbase.RebalanceStatusNotRunning {
+	if rebalanceState.Running {
 		return fmt.Errorf("cannot rebalance, as another rebalance is already running: %s", rebalanceState)
 	}
 
