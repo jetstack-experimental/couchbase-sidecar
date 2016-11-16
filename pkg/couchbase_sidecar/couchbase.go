@@ -68,5 +68,5 @@ func (cs *CouchbaseSidecar) JoinCluster() error {
 		return err
 	}
 
-	return cCluster.AddNode(cs.NodeName(), cs.couchbaseConfig.Username, cs.couchbaseConfig.Password, cs.couchbaseConfig.Services)
+	return cCluster.AddNode(cs.NodeName(), cs.couchbaseConfig.Username, cs.couchbaseConfig.Password, cs.couchbaseConfig.Services, cs.FailureDomain())
 }

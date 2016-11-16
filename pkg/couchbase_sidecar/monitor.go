@@ -64,6 +64,7 @@ func (m *monitor) checkNode() error {
 		m.cs.couchbaseConfig.Username,
 		m.cs.couchbaseConfig.Password,
 		m.cs.couchbaseConfig.Services,
+		m.cs.FailureDomain(),
 	)
 
 	return err

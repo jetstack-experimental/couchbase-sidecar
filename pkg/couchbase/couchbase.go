@@ -465,7 +465,13 @@ func (c *Couchbase) Initialize(hostname string, services []string) error {
 	return nil
 }
 
-func (c *Couchbase) AddNode(nodeName, username, password string, services []string) error {
+func (c *Couchbase) AddNode(nodeName, username, password string, services []string, serverGroup string) error {
+
+	serverGroupURI, err := c.ServerGroupURI(serverGroup)
+	if err != nil {
+		return err
+	}
+
 	data := url.Values{}
 	data.Set("hostname", nodeName)
 	data.Set("user", username)
@@ -478,7 +484,7 @@ func (c *Couchbase) AddNode(nodeName, username, password string, services []stri
 		password,
 		strings.Join(services, ","),
 	)
-	resp, err := c.PostForm("/controller/addNode", data)
+	resp, err := c.PostForm(serverGroupURI, data)
 	if err != nil {
 		return err
 	}

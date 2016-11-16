@@ -11,6 +11,8 @@ import (
 )
 
 const ConfigMapClusterID string = "couchbase.cluster-id"
+const FailureDomainLabel string = "failure-domain.beta.kubernetes.io/zone"
+const FailureDomainDefault string = "unknown"
 
 func (cs *CouchbaseSidecar) KubernetesClientset() *kube.Clientset {
 	if cs.kubernetesClientset == nil {
@@ -201,4 +203,21 @@ func (cs *CouchbaseSidecar) UpdateClusterID(clusterID string) error {
 	cm.Data[ConfigMapClusterID] = clusterID
 	_, err = client.Update(cm)
 	return err
+}
+
+func (cs *CouchbaseSidecar) FailureDomain() string {
+	nodeName := cs.Pod().Spec.NodeName
+
+	node, err := cs.KubernetesClientset().Core().Nodes().Get(nodeName)
+	if err != nil {
+		cs.Log().Warnf("unable to get node object '%s': %s", nodeName, err)
+		return FailureDomainDefault
+	}
+
+	if failureDomain, ok := node.GetLabels()[FailureDomainLabel]; ok {
+		return failureDomain
+	}
+
+	cs.Log().Warnf("unable to find node label '%s'", FailureDomainLabel)
+	return FailureDomainDefault
 }
