@@ -41,10 +41,6 @@ type Node struct {
 	OTPNode              string   `json:"otpNode,omitempty"`
 }
 
-const RebalanceStatusNotRunning string = "running"
-const RebalanceStatusRunning string = "notRunning"
-const RebalanceStatusStale string = "stale"
-
 var ErrorNodeUninitialized error = fmt.Errorf("Node uninitialized")
 
 type Cluster struct {
@@ -142,25 +138,20 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 			c.Log().Warnf("Error while checking rebalance status: %s", err)
 			continue
 		}
-		c.Log().Infof("Rebalance status: '%+v'", status)
 
-		nodes, err := c.Nodes()
-		if err != nil {
-			c.Log().Warnf("Error while listing nodes: %s", err)
-			continue
+		if !status.Running {
+			c.Log().Infof("rebalance finished")
+			break
 		}
 
-		allRemoved := true
-		for _, node := range nodes {
-			if strSliceContains(removeNodes, node.Hostname) {
-				allRemoved = true
-				break
+		for _, node := range ejectNodes {
+			if strSliceContains(status.Nodes, node) {
+				continue
 			}
 		}
 
-		if allRemoved {
-			break
-		}
+		c.Log().Infof("rebalance finished")
+		break
 
 		// TODO: Really sleep?
 		time.Sleep(500 * time.Millisecond)
@@ -352,18 +343,6 @@ func (c *Couchbase) Rebalance(knownNodes, ejectedNodes []string) error {
 	return c.CheckStatusCode(resp, []int{200})
 }
 
-func (c *Couchbase) RebalanceStatus() (string, error) {
-	c.info = nil
-	info, err := c.Info()
-	if err != nil {
-		return "", err
-	}
-	if info.RebalanceStatus == "" {
-		info.RebalanceStatus = RebalanceStatusNotRunning
-	}
-	return info.RebalanceStatus, nil
-}
-
 func (c *Couchbase) Cluster() (*Cluster, error) {
 	if c.cluster == nil {
 		resp, err := c.Request("GET", "/pools", nil, nil)
@@ -495,6 +474,7 @@ func (c *Couchbase) Healthy() error {
 		return err
 	}
 
+	// TODO: This should involve a clusterID comparison
 	if len(nodes) < 2 {
 		return fmt.Errorf("Node hasn't joined the cluster yet")
 	}
