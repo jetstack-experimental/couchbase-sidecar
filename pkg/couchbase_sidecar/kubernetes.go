@@ -103,10 +103,8 @@ func (cs *CouchbaseSidecar) readLabels() error {
 	cs.couchbaseConfig.Name = strings.ToLower(clusterName)
 
 	// TODO: detect the service name throught the PetSet variable
-	if mainType != "query" {
-		serviceName := fmt.Sprintf("%s-%s", cs.couchbaseConfig.Name, mainType)
-		cs.serviceName = &serviceName
-	}
+	serviceName := fmt.Sprintf("%s-%s", cs.couchbaseConfig.Name, mainType)
+	cs.serviceName = &serviceName
 
 	return nil
 }
