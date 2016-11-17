@@ -189,6 +189,7 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 		}
 
 		c.Log().Infof("rebalance finished")
+		break
 	}
 
 	return nil
