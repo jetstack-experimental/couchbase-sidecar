@@ -29,7 +29,7 @@ func (m *monitor) checkNode() error {
 	nodename := m.cs.NodeName()
 	if err == couchbase.ErrorNodeUninitialized {
 		m.Log().Infof("initializing node ...")
-		err := cLocal.Initialize(nodename, m.cs.couchbaseConfig.Services)
+		err := cLocal.Initialize(nodename, m.cs.couchbaseConfig.Services, m.cs.FailureDomain())
 		if err != nil {
 			return fmt.Errorf("initializing node failed: %s", err)
 		}

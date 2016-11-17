@@ -111,10 +111,14 @@ func (c *Couchbase) request(method, path string, body io.Reader, header *http.He
 	return client.Do(req)
 }
 
-func (c *Couchbase) PostForm(path string, data url.Values) (resp *http.Response, err error) {
+func (c *Couchbase) Form(method string, path string, data url.Values) (resp *http.Response, err error) {
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/x-www-form-urlencoded")
-	return c.Request("POST", path, []byte(data.Encode()), &headers)
+	return c.Request(method, path, []byte(data.Encode()), &headers)
+}
+
+func (c *Couchbase) PostForm(path string, data url.Values) (resp *http.Response, err error) {
+	return c.Form("POST", path, data)
 }
 
 func (c *Couchbase) RemoveNodes(removeNodes []string) error {
@@ -453,7 +457,7 @@ func (c *Couchbase) SetupAuth() error {
 	return nil
 }
 
-func (c *Couchbase) Initialize(hostname string, services []string) error {
+func (c *Couchbase) Initialize(hostname string, services []string, serverGroupName string) error {
 	err := c.UpdateHostname(hostname)
 	if err != nil {
 		return err
@@ -464,12 +468,17 @@ func (c *Couchbase) Initialize(hostname string, services []string) error {
 		return err
 	}
 
+	err = c.UpdateServerGroupName(serverGroupName)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (c *Couchbase) AddNode(nodeName, username, password string, services []string, serverGroup string) error {
 
-	serverGroupURI, err := c.ServerGroupURI(serverGroup)
+	serverGroupURI, err := c.ServerGroupAddNodeURI(serverGroup)
 	if err != nil {
 		return err
 	}
