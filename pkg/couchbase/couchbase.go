@@ -136,7 +136,9 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 		return err
 	}
 
+	var minSleep = time.Second * 2
 	var sleep time.Duration = 0
+	var nodeInClusterCount = 0
 	for {
 		time.Sleep(sleep)
 
@@ -147,6 +149,9 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 			continue
 		}
 		sleep = time.Duration(int64(status.RecommendedRefreshPeriod * float64(time.Second)))
+		if sleep < minSleep {
+			sleep = minSleep
+		}
 
 		nodeInRebalance := false
 		for _, node := range ejectNodes {
@@ -156,6 +161,7 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 		}
 
 		if nodeInRebalance {
+			nodeInClusterCount = 0
 			continue
 		}
 
@@ -173,8 +179,13 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 		}
 
 		if nodeInCluster {
-			c.Log().Fatalf("rebalance finished, but node is still in the cluster. Rebalance failed")
-			break
+			if nodeInClusterCount > 10 {
+				// better handling would probably be to prevent further scaling down / pod termination
+				c.Log().Fatalf("rebalance finished, but node is still in the cluster. Rebalance failed")
+				break
+			}
+			nodeInClusterCount++
+			continue
 		}
 
 		c.Log().Infof("rebalance finished")
