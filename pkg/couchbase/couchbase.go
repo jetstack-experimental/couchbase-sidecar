@@ -167,8 +167,10 @@ func (c *Couchbase) RemoveNodes(removeNodes []string) error {
 				nodeInCluster = true
 			}
 		}
+
 		if nodeInCluster {
-			continue
+			c.Log().Fatalf("rebalance finished, but node is still in the cluster. Rebalance failed")
+			break
 		}
 
 		c.Log().Infof("rebalance finished")
