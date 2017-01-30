@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/dmaier-couchbase/cb-openshift3/tools/couchbase_sidecar/pkg/couchbase"
+	"github.com/jetstack-experimental/couchbase-sidecar/pkg/couchbase"
 )
 
 type monitor struct {

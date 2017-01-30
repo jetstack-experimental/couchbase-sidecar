@@ -1,22 +1,30 @@
-IMAGE_NAME:=jetstackexperimental/couchbase-sidecar
-APP_NAME:=couchbase-sidecar
+REGISTRY := jetstackexperimental
+IMAGE_NAME := couchbase-sidecar
+IMAGE_TAGS := canary
+BUILD_TAG := build
+
 BUILD_DATE := $(shell date +%FT%T%z)
+
+APP_VERSION := dev
+
 build: version
 	CGO_ENABLED=0 GOOS=linux go build \
 		-a -tags netgo \
 		-o couchbase-sidecar \
 		-ldflags "-X main.AppGitState=${GIT_STATE} -X main.AppGitCommit=${GIT_COMMIT} -X main.AppVersion=${APP_VERSION} -X main.AppBuildDate=${BUILD_DATE}"
 
-image: build
-	docker build -t $(IMAGE_NAME):latest .
-	docker build -t $(IMAGE_NAME):$(APP_VERSION) .
+image:
+	docker build -t $(REGISTRY)/$(IMAGE_NAME):$(BUILD_TAG) .
 
 push: image
-	docker push $(IMAGE_NAME):latest
-	docker push $(IMAGE_NAME):$(APP_VERSION)
+	set -e; \
+	for tag in $(IMAGE_TAGS); do \
+		docker tag $(REGISTRY)/$(IMAGE_NAME):$(BUILD_TAG) $(REGISTRY)/$(IMAGE_NAME):$${tag} ; \
+		docker push $(REGISTRY)/$(IMAGE_NAME):$${tag}; \
+	done
 
 push_minikube: image
-	docker save $(IMAGE_NAME):$(APP_VERSION) | minikube ssh -- docker load
+	docker save $(REGISTRY)/$(IMAGE_NAME):$(BUILD_TAG) | minikube ssh -- docker load
 
 #codegen:
 #	mockgen -package=mocks -source=pkg/interfaces/interfaces.go > pkg/mocks/mocks.go
@@ -24,4 +32,3 @@ push_minikube: image
 version:
 	$(eval GIT_STATE := $(shell if test -z "`git status --porcelain 2> /dev/null`"; then echo "clean"; else echo "dirty"; fi))
 	$(eval GIT_COMMIT := $(shell git rev-parse HEAD))
-	$(eval APP_VERSION := $(shell cat VERSION))

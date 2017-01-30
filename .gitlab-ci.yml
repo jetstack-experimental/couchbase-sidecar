@@ -1,0 +1,71 @@
+variables:
+  DOCKER_DRIVER: overlay
+  GO_PROJECT_DIR: /go/src/github.com/jetstack-experimental/couchbase-sidecar
+
+stages:
+- build
+- docker
+
+build:golang:
+  image: golang:1.7
+  stage: build
+  tags:
+  - docker
+  script:
+  - export OLD_DIR=$(pwd)
+  - mkdir -p $(dirname ${GO_PROJECT_DIR})
+  - mv ${OLD_DIR} ${GO_PROJECT_DIR}
+  - cd ${GO_PROJECT_DIR}
+  - make build APP_VERSION="${CI_BUILD_TAG}"
+  - mv ${GO_PROJECT_DIR} ${OLD_DIR}
+  artifacts:
+    paths:
+    - couchbase-sidecar
+
+build:golang:
+  image: golang:1.7
+  stage: build
+  tags:
+  - docker
+  script:
+  - export OLD_DIR=$(pwd)
+  - mkdir -p $(dirname ${GO_PROJECT_DIR})
+  - mv ${OLD_DIR} ${GO_PROJECT_DIR}
+  - cd ${GO_PROJECT_DIR}
+  - make build
+  - mv ${GO_PROJECT_DIR} ${OLD_DIR}
+  artifacts:
+    paths:
+    - couchbase-sidecar
+
+docker:image:
+  image: docker:latest
+  stage: docker
+  tags:
+  - docker
+  script:
+  - apk --update add make
+  - mkdir -p ~/.docker && echo "${DOCKER_AUTH_CONFIG}" > ~/.docker/config.json && chmod 600 ~/.docker/config.json
+  - make image test push IMAGE_TAGS="${CI_BUILD_REF_SLUG}-${CI_PIPELINE_ID} canary"
+  only:
+  - master
+  except:
+  - tags
+  services:
+  - docker:dind
+
+docker:image_tagged:
+  image: docker:latest
+  stage: docker
+  tags:
+  - docker
+  script:
+  - apk --update add make
+  - mkdir -p ~/.docker && echo "${DOCKER_AUTH_CONFIG}" > ~/.docker/config.json && chmod 600 ~/.docker/config.json
+  - make image test push IMAGE_TAGS="${CI_BUILD_TAG} latest"
+  only:
+  - tags
+  except:
+  - master
+  services:
+  - docker:dind

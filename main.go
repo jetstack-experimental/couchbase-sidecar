@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/dmaier-couchbase/cb-openshift3/tools/couchbase_sidecar/pkg/couchbase_sidecar"
+	"github.com/jetstack-experimental/couchbase-sidecar/pkg/couchbase_sidecar"
 	"os"
 )
 
