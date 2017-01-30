@@ -16,6 +16,9 @@ build: version
 image:
 	docker build -t $(REGISTRY)/$(IMAGE_NAME):$(BUILD_TAG) .
 
+test:
+	go test ./pkg/...
+
 push: image
 	set -e; \
 	for tag in $(IMAGE_TAGS); do \
