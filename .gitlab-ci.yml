@@ -32,7 +32,7 @@ build:golang:
   - mkdir -p $(dirname ${GO_PROJECT_DIR})
   - mv ${OLD_DIR} ${GO_PROJECT_DIR}
   - cd ${GO_PROJECT_DIR}
-  - make build
+  - make test build
   - mv ${GO_PROJECT_DIR} ${OLD_DIR}
   artifacts:
     paths:
@@ -46,7 +46,7 @@ docker:image:
   script:
   - apk --update add make
   - mkdir -p ~/.docker && echo "${DOCKER_AUTH_CONFIG}" > ~/.docker/config.json && chmod 600 ~/.docker/config.json
-  - make image test push IMAGE_TAGS="${CI_BUILD_REF_SLUG}-${CI_PIPELINE_ID} canary"
+  - make image push IMAGE_TAGS="${CI_BUILD_REF_SLUG}-${CI_PIPELINE_ID} canary"
   only:
   - master
   except:
@@ -62,7 +62,7 @@ docker:image_tagged:
   script:
   - apk --update add make
   - mkdir -p ~/.docker && echo "${DOCKER_AUTH_CONFIG}" > ~/.docker/config.json && chmod 600 ~/.docker/config.json
-  - make image test push IMAGE_TAGS="${CI_BUILD_TAG} latest"
+  - make image push IMAGE_TAGS="${CI_BUILD_TAG} latest"
   only:
   - tags
   except:
