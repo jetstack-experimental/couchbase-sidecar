@@ -1,0 +1,30 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ template "fullname" . }}
+spec:
+  ports:
+  - name: cb-admin
+    port: 8091
+  selector:
+    name: {{ template "fullname" . }}
+{{- $global := . }}
+{{- range $role, $config := .Values.roles }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "fullname" $global }}-{{ $role }}
+  labels:
+    chart: "{{ $global.Chart.Name }}-{{ $global.Chart.Version }}"
+  annotations:
+    service.alpha.kubernetes.io/tolerate-unready-endpoints: 'true'
+spec:
+  clusterIP: None
+  ports:
+  - name: cb-admin
+    port: 8091
+  selector:
+    name: {{ template "fullname" $global }}
+    type: {{ $role }}
+{{- end }}

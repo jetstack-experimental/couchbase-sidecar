@@ -1,0 +1,30 @@
+{{- $global := . }}
+{{- range $role, $config := .Values.roles }}
+---
+apiVersion: {{ $global.Values.statefulSet.apiVersion | quote }}
+kind: {{ $global.Values.statefulSet.kind | quote }}
+metadata:
+  name: {{ template "fullname" $global }}-{{ $role }}
+  labels:
+    chart: "{{ $global.Chart.Name }}-{{ $global.Chart.Version }}"
+spec:
+  serviceName: {{ template "fullname" $global }}-{{ $role }}
+  replicas: {{ $config.replicaCount }}
+  template:
+    metadata:
+      labels:
+        heritage: {{ $global.Release.Service | quote }}
+        release: {{ $global.Release.Name | quote }}
+        name: {{ template "fullname" $global }}
+        app: couchbase
+        type: {{ $role }}
+      annotations:
+        pod.alpha.kubernetes.io/initialized: 'true'
+    spec:
+      terminationGracePeriodSeconds: 86400
+      containers:
+{{ include "couchbase-container" $global | indent 6 }}
+{{ include "sidecar-container" $global | indent 6 }}
+      volumes:
+{{ toYaml $global.Values.volumes | indent 6 }}
+{{- end }}

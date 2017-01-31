@@ -1,0 +1,15 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
+data:
+  couchbase.username: {{ .Values.couchbase.username | quote }}
+  # TODO: This variable should be really inside of the secret
+  couchbase.password: {{ .Values.couchbase.password | quote }}
+  couchbase.cluster-id: ''
+  couchbase.bucket.bucket: ''
+  couchbase.data.memory-limit: 512Mi
+  couchbase.index.memory-limit: 512Mi
+  couchbase.query.memory-limit: 512Mi
