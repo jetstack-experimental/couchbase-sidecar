@@ -63,7 +63,7 @@ Couchbase Container
   - containerPort: 4369
     name: empd
   resources:
-{{ toYaml .Values.sidecar.resources | indent 4 }}
+{{ toYaml .Values.couchbase.resources | indent 4 }}
   volumeMounts:
   - mountPath: "/opt/couchbase/var"
     name: data
