@@ -7,7 +7,7 @@ BUILD_DATE := $(shell date +%FT%T%z)
 
 APP_VERSION := dev
 
-GKE_CLUSTER_NAME := couchbase-test
+GKE_CLUSTER_NAME := couchbase
 GKE_CLUSTER_ZONE := europe-west1-b
 GKE_CLUSTER_ZONE_ALTERNATIVE := europe-west1-c
 GKE_CLUSTER_PROJECT := jetstack-demo
