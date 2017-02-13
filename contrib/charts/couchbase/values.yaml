@@ -12,13 +12,7 @@ couchbase:
     repository: couchbase/server
     tag: enterprise-4.5.1
     pullPolicy: IfNotPresent
-  resources:
-    limits:
-      cpu: 1
-      memory: 512Mi
-    requests:
-      cpu: 100m
-      memory: 512Mi
+
 sidecar:
   image:
     repository: jetstackexperimental/couchbase-sidecar
@@ -32,22 +26,31 @@ sidecar:
       cpu: 10m
       memory: 32Mi
 
-volumes:
-- name: sidecar
-  emptyDir: {}
-- name: data
-  emptyDir: {}
-
 roles:
   data:
     replicaCount: 3
+    resources:
+      limits:
+        cpu: 2
+        memory: 2Gi
+      requests:
+        cpu: 100m
+        memory: 2Gi
   query:
     replicaCount: 3
+    resources:
+      limits:
+        cpu: 1
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 1Gi
   index:
     replicaCount: 3
-
-#service:
-#  name: nginx
-#  type: ClusterIP
-#  externalPort: 80
-#  internalPort: 80
+    resources:
+      limits:
+        cpu: 1
+        memory: 1Gi
+      requests:
+        cpu: 100m
+        memory: 1Gi
