@@ -91,5 +91,16 @@ spec:
           name: sidecar
 {{ include "sidecar-container" $global | indent 6 }}
       volumes:
-{{ toYaml $global.Values.volumes | indent 6 }}
+      - name: sidecar
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      annotations:
+        volume.alpha.kubernetes.io/storage-class: {{ $config.storage.class | quote }}
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: {{ $config.storage.size | quote }}
 {{- end }}

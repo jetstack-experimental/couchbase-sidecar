@@ -29,6 +29,9 @@ sidecar:
 roles:
   data:
     replicaCount: 3
+    storage:
+      class: anything
+      size: 50Gi
     resources:
       limits:
         cpu: 2
@@ -38,6 +41,9 @@ roles:
         memory: 2Gi
   query:
     replicaCount: 3
+    storage:
+      class: anything
+      size: 5Gi
     resources:
       limits:
         cpu: 1
@@ -47,6 +53,9 @@ roles:
         memory: 1Gi
   index:
     replicaCount: 3
+    storage:
+      class: anything
+      size: 5Gi
     resources:
       limits:
         cpu: 1
