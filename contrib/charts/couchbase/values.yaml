@@ -29,6 +29,7 @@ sidecar:
 roles:
   data:
     replicaCount: 3
+    terminationGracePeriodSeconds: 86400
     storage:
       class: anything
       size: 50Gi
@@ -41,6 +42,7 @@ roles:
         memory: 2Gi
   query:
     replicaCount: 3
+    terminationGracePeriodSeconds: 300
     storage:
       class: anything
       size: 5Gi
@@ -53,6 +55,7 @@ roles:
         memory: 1Gi
   index:
     replicaCount: 3
+    terminationGracePeriodSeconds: 300
     storage:
       class: anything
       size: 5Gi

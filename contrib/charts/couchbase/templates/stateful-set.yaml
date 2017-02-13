@@ -21,7 +21,7 @@ spec:
       annotations:
         pod.alpha.kubernetes.io/initialized: 'true'
     spec:
-      terminationGracePeriodSeconds: 86400
+      terminationGracePeriodSeconds: {{ $config.terminationGracePeriodSeconds }}
       containers:
       - name: couchbase
         image: {{ $global.Values.couchbase.image.repository }}:{{ $global.Values.couchbase.image.tag }}
