@@ -10,6 +10,6 @@ data:
   couchbase.password: {{ .Values.couchbase.password | quote }}
   couchbase.cluster-id: ''
   couchbase.bucket.bucket: ''
-  couchbase.data.memory-limit: 512Mi
-  couchbase.index.memory-limit: 512Mi
-  couchbase.query.memory-limit: 512Mi
+  couchbase.data.memory-limit: {{ .Values.roles.data.resources.limits.memory }}
+  couchbase.index.memory-limit: {{ .Values.roles.index.resources.limits.memory }}
+  couchbase.query.memory-limit: {{ .Values.roles.query.resources.limits.memory }}
