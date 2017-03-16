@@ -1,4 +1,17 @@
 {{- $global := . }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "fullname" $global }}
+  labels:
+    chart: "{{ $global.Chart.Name }}-{{ $global.Chart.Version }}"
+spec:
+  ports:
+  - name: cb-admin
+    port: 8091
+  selector:
+    name: {{ template "fullname" $global }}
 {{- range $role, $config := .Values.roles }}
 ---
 apiVersion: v1
