@@ -51,7 +51,7 @@ $ oc policy add-role-to-user edit system:serviceaccount:couchbase:default -n cou
 $ odm policy add-cluster-role-to-user system:node-reader system:serviceaccount:couchbase:default
 ```
 
-4) The [couchbase/docker](https://hub.docker.com/r/couchbase/server/) container image initially runs as root for init, and then runs Couchbase components as a couchbase user. By default, OpenShift will prevent root execution in a container so it is necessary to relax these restrictions for the couchbase project default serviceaccount.
+4) The [couchbase/docker](https://hub.docker.com/r/couchbase/server/) container image initially runs as root for init, and then runs Couchbase components as a couchbase user. By default, OpenShift will prevent root execution in a container so it is necessary to relax these restrictions for the `couchbase` project default serviceaccount.
 
 ```bash
 $ oadm policy add-scc-to-user anyuid system:serviceaccount:couchbase:default
