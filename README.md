@@ -21,7 +21,7 @@ being needed to bring your cluster back online. Please check the `Limitations/Ca
 
 ### OpenShift
 
-1) Add Couchbase templates to the `openshift` project, but before doing so update the `###REGISTRY_IP###` in the templates with your OpenShift private registry IP/hostname.
+1) Add Couchbase templates to the `openshift` project:
 
 ```bash
 $ oc apply --namespace=openshift -f openshift/templates/

@@ -64,7 +64,7 @@ objects:
         terminationGracePeriodSeconds: 86400
         containers:
         - name: couchbase
-          image: "${REGISTRY}/openshift/${IMAGE_NAME}"
+          image: "${IMAGE_NAME}"
           imagePullPolicy: Always
           livenessProbe:
             initialDelaySeconds: 30
@@ -210,7 +210,7 @@ objects:
         terminationGracePeriodSeconds: 86400
         containers:
         - name: couchbase
-          image: "${REGISTRY}/openshift/${IMAGE_NAME}"
+          image: "${IMAGE_NAME}"
           imagePullPolicy: Always
           livenessProbe:
             initialDelaySeconds: 30
@@ -356,7 +356,7 @@ objects:
         terminationGracePeriodSeconds: 86400
         containers:
         - name: couchbase
-          image: "${REGISTRY}/openshift/${IMAGE_NAME}"
+          image: "${IMAGE_NAME}"
           imagePullPolicy: Always
           livenessProbe:
             initialDelaySeconds: 30
@@ -496,10 +496,7 @@ parameters:
   value: bucket
   required: true
 - name: IMAGE_NAME
-  value: couchbase-noroot:4.5.1-enterprise
-  required: true
-- name: REGISTRY
-  value: "###REGISTRY_IP###:5000"
+  value: couchbase/server:enterprise-4.5.1
   required: true
 - name: REPLICAS_DATA
   displayName: Desired Pod count for data nodes
