@@ -506,7 +506,7 @@ parameters:
 - name: MEMORY_LIMIT_DATA
   displayName: Memory Limit for data nodes
   description: Maximum amount of memory data container can use.
-  value: 512Mi
+  value: 1Gi
 - name: REPLICAS_INDEX
   displayName: Desired Pod count for index nodes
   description: How many index nodes should be provisioned? This value can be changed
@@ -515,7 +515,7 @@ parameters:
 - name: MEMORY_LIMIT_INDEX
   displayName: Memory Limit for index nodes
   description: Maximum amount of memory index container can use.
-  value: 512Mi
+  value: 1Gi
 - name: REPLICAS_QUERY
   displayName: Desired Pod count for query nodes
   description: How many query nodes should be provisioned? This value can be changed
@@ -524,6 +524,6 @@ parameters:
 - name: MEMORY_LIMIT_QUERY
   displayName: Memory Limit for query nodes
   description: Maximum amount of memory query container can use.
-  value: 512Mi
+  value: 1Gi
 labels:
   template: couchbase-statefulset-ephemeral-template
