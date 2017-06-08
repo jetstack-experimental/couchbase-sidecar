@@ -1,0 +1,529 @@
+---
+apiVersion: v1
+kind: Template
+metadata:
+  name: couchbase-statefulset-ephemeral
+  annotations:
+    description: Couchbase database service, with ephemeral storage.
+    iconClass: icon-couchbase
+    tags: database,couchbase
+objects:
+- kind: ConfigMap
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}"
+  data:
+    couchbase.username: "${COUCHBASE_USER}"
+    couchbase.password: "${COUCHBASE_PASSWORD}"
+    couchbase.cluster-id: ''
+    couchbase.bucket.${COUCHBASE_BUCKET}: ''
+    couchbase.data.memory-limit: "${MEMORY_LIMIT_DATA}"
+    couchbase.index.memory-limit: "${MEMORY_LIMIT_INDEX}"
+    couchbase.query.memory-limit: "${MEMORY_LIMIT_QUERY}"
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}"
+  spec:
+    ports:
+    - name: cb-admin
+      port: 8091
+    selector:
+      name: "${DATABASE_SERVICE_NAME}"
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}-query"
+    annotations:
+      service.alpha.kubernetes.io/tolerate-unready-endpoints: 'true'
+  spec:
+    clusterIP: None
+    ports:
+    - name: cb-admin
+      port: 8091
+    selector:
+      name: "${DATABASE_SERVICE_NAME}"
+      type: query
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}-query"
+  spec:
+    serviceName: "${DATABASE_SERVICE_NAME}-query"
+    replicas: "${REPLICAS_QUERY}"
+    template:
+      metadata:
+        labels:
+          name: "${DATABASE_SERVICE_NAME}"
+          app: couchbase
+          type: query
+        annotations:
+          pod.alpha.kubernetes.io/initialized: 'true'
+          scheduler.alpha.kubernetes.io/affinity: '{"podAntiAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":[{"labelSelector":{"matchExpressions":[{"key":"app","operator":"In","values":["couchbase"]},{"key":"type","operator":"In","values":["data","index"]},{"key":"name","operator":"In","values":["${DATABASE_SERVICE_NAME}"]}]},"topologyKey":"kubernetes.io/hostname"}]}}'
+      spec:
+        terminationGracePeriodSeconds: 86400
+        containers:
+        - name: couchbase
+          image: "${IMAGE_NAME}"
+          imagePullPolicy: Always
+          livenessProbe:
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 8091
+            timeoutSeconds: 1
+          env:
+          - name: COUCHBASE_USER
+            value: "${COUCHBASE_USER}"
+          - name: COUCHBASE_PASSWORD
+            value: "${COUCHBASE_PASSWORD}"
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - "/sidecar/couchbase-sidecar"
+                - stop
+          ports:
+          - containerPort: 8091
+            name: cb-admin
+          - containerPort: 8092
+            name: cb-views
+          - containerPort: 8093
+            name: cb-queries
+          - containerPort: 8094
+            name: cb-search
+          - containerPort: 9100
+            name: cb-int-ind-ad
+          - containerPort: 9101
+            name: cb-int-ind-sc
+          - containerPort: 9102
+            name: cb-int-ind-ht
+          - containerPort: 9103
+            name: cb-int-ind-in
+          - containerPort: 9104
+            name: cb-int-ind-ca
+          - containerPort: 9105
+            name: cb-int-ind-ma
+          - containerPort: 9998
+            name: cb-int-rest
+          - containerPort: 9999
+            name: cb-int-gsi
+          - containerPort: 11207
+            name: cb-memc-ssl
+          - containerPort: 11209
+            name: cb-int-bu
+          - containerPort: 11210
+            name: cb-moxi
+          - containerPort: 11211
+            name: cb-memc
+          - containerPort: 11214
+            name: cb-ssl-xdr1
+          - containerPort: 11215
+            name: cb-ssl-xdr2
+          - containerPort: 18091
+            name: cb-admin-ssl
+          - containerPort: 18092
+            name: cb-views-ssl
+          - containerPort: 18093
+            name: cb-queries-ssl
+          - containerPort: 4369
+            name: empd
+          resources:
+            requests:
+              memory: "${MEMORY_LIMIT_QUERY}"
+              cpu: 0.1
+            limits:
+              memory: "${MEMORY_LIMIT_QUERY}"
+          volumeMounts:
+          - mountPath: "/opt/couchbase/var"
+            name: data
+          - mountPath: "/sidecar"
+            name: sidecar
+        - name: couchbase-sidecar
+          image: jetstackexperimental/couchbase-sidecar:0.0.2
+          imagePullPolicy: Always
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          readinessProbe:
+            httpGet:
+              path: "/_status/ready"
+              port: 8080
+            timeoutSeconds: 3
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - "/couchbase-sidecar"
+                - stop
+          ports:
+          - containerPort: 8080
+            name: sidecar
+          volumeMounts:
+          - mountPath: "/sidecar"
+            name: sidecar
+        volumes:
+        - name: sidecar
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}-data"
+    annotations:
+      service.alpha.kubernetes.io/tolerate-unready-endpoints: 'true'
+  spec:
+    clusterIP: None
+    ports:
+    - name: cb-admin
+      port: 8091
+    selector:
+      name: "${DATABASE_SERVICE_NAME}"
+      type: data
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}-data"
+  spec:
+    serviceName: "${DATABASE_SERVICE_NAME}-data"
+    replicas: "${REPLICAS_DATA}"
+    template:
+      metadata:
+        labels:
+          name: "${DATABASE_SERVICE_NAME}"
+          app: couchbase
+          type: data
+        annotations:
+          pod.alpha.kubernetes.io/initialized: 'true'
+          scheduler.alpha.kubernetes.io/affinity: '{"podAntiAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":[{"labelSelector":{"matchExpressions":[{"key":"app","operator":"In","values":["couchbase"]},{"key":"type","operator":"In","values":["data","index"]},{"key":"name","operator":"In","values":["${DATABASE_SERVICE_NAME}"]}]},"topologyKey":"kubernetes.io/hostname"}]}}'
+      spec:
+        terminationGracePeriodSeconds: 86400
+        containers:
+        - name: couchbase
+          image: "${IMAGE_NAME}"
+          imagePullPolicy: Always
+          livenessProbe:
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 8091
+            timeoutSeconds: 1
+          env:
+          - name: COUCHBASE_USER
+            value: "${COUCHBASE_USER}"
+          - name: COUCHBASE_PASSWORD
+            value: "${COUCHBASE_PASSWORD}"
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - "/sidecar/couchbase-sidecar"
+                - stop
+          ports:
+          - containerPort: 8091
+            name: cb-admin
+          - containerPort: 8092
+            name: cb-views
+          - containerPort: 8093
+            name: cb-queries
+          - containerPort: 8094
+            name: cb-search
+          - containerPort: 9100
+            name: cb-int-ind-ad
+          - containerPort: 9101
+            name: cb-int-ind-sc
+          - containerPort: 9102
+            name: cb-int-ind-ht
+          - containerPort: 9103
+            name: cb-int-ind-in
+          - containerPort: 9104
+            name: cb-int-ind-ca
+          - containerPort: 9105
+            name: cb-int-ind-ma
+          - containerPort: 9998
+            name: cb-int-rest
+          - containerPort: 9999
+            name: cb-int-gsi
+          - containerPort: 11207
+            name: cb-memc-ssl
+          - containerPort: 11209
+            name: cb-int-bu
+          - containerPort: 11210
+            name: cb-moxi
+          - containerPort: 11211
+            name: cb-memc
+          - containerPort: 11214
+            name: cb-ssl-xdr1
+          - containerPort: 11215
+            name: cb-ssl-xdr2
+          - containerPort: 18091
+            name: cb-admin-ssl
+          - containerPort: 18092
+            name: cb-views-ssl
+          - containerPort: 18093
+            name: cb-queries-ssl
+          - containerPort: 4369
+            name: empd
+          resources:
+            requests:
+              memory: "${MEMORY_LIMIT_DATA}"
+              cpu: 0.1
+            limits:
+              memory: "${MEMORY_LIMIT_DATA}"
+          volumeMounts:
+          - mountPath: "/opt/couchbase/var"
+            name: data
+          - mountPath: "/sidecar"
+            name: sidecar
+        - name: couchbase-sidecar
+          image: jetstackexperimental/couchbase-sidecar:0.0.2
+          imagePullPolicy: Always
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          readinessProbe:
+            httpGet:
+              path: "/_status/ready"
+              port: 8080
+            timeoutSeconds: 3
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - "/couchbase-sidecar"
+                - stop
+          ports:
+          - containerPort: 8080
+            name: sidecar
+          volumeMounts:
+          - mountPath: "/sidecar"
+            name: sidecar
+        volumes:
+        - name: sidecar
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+- kind: Service
+  apiVersion: v1
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}-index"
+    annotations:
+      service.alpha.kubernetes.io/tolerate-unready-endpoints: 'true'
+  spec:
+    clusterIP: None
+    ports:
+    - name: cb-admin
+      port: 8091
+    selector:
+      name: "${DATABASE_SERVICE_NAME}"
+      type: index
+- apiVersion: apps/v1beta1
+  kind: StatefulSet
+  metadata:
+    name: "${DATABASE_SERVICE_NAME}-index"
+  spec:
+    serviceName: "${DATABASE_SERVICE_NAME}-index"
+    replicas: "${REPLICAS_INDEX}"
+    template:
+      metadata:
+        labels:
+          name: "${DATABASE_SERVICE_NAME}"
+          app: couchbase
+          type: index
+        annotations:
+          pod.alpha.kubernetes.io/initialized: 'true'
+          scheduler.alpha.kubernetes.io/affinity: '{"podAntiAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":[{"labelSelector":{"matchExpressions":[{"key":"app","operator":"In","values":["couchbase"]},{"key":"type","operator":"In","values":["data","index"]},{"key":"name","operator":"In","values":["${DATABASE_SERVICE_NAME}"]}]},"topologyKey":"kubernetes.io/hostname"}]}}'
+      spec:
+        terminationGracePeriodSeconds: 86400
+        containers:
+        - name: couchbase
+          image: "${IMAGE_NAME}"
+          imagePullPolicy: Always
+          livenessProbe:
+            initialDelaySeconds: 30
+            tcpSocket:
+              port: 8091
+            timeoutSeconds: 1
+          env:
+          - name: COUCHBASE_USER
+            value: "${COUCHBASE_USER}"
+          - name: COUCHBASE_PASSWORD
+            value: "${COUCHBASE_PASSWORD}"
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - "/sidecar/couchbase-sidecar"
+                - stop
+          ports:
+          - containerPort: 8091
+            name: cb-admin
+          - containerPort: 8092
+            name: cb-views
+          - containerPort: 8093
+            name: cb-queries
+          - containerPort: 8094
+            name: cb-search
+          - containerPort: 9100
+            name: cb-int-ind-ad
+          - containerPort: 9101
+            name: cb-int-ind-sc
+          - containerPort: 9102
+            name: cb-int-ind-ht
+          - containerPort: 9103
+            name: cb-int-ind-in
+          - containerPort: 9104
+            name: cb-int-ind-ca
+          - containerPort: 9105
+            name: cb-int-ind-ma
+          - containerPort: 9998
+            name: cb-int-rest
+          - containerPort: 9999
+            name: cb-int-gsi
+          - containerPort: 11207
+            name: cb-memc-ssl
+          - containerPort: 11209
+            name: cb-int-bu
+          - containerPort: 11210
+            name: cb-moxi
+          - containerPort: 11211
+            name: cb-memc
+          - containerPort: 11214
+            name: cb-ssl-xdr1
+          - containerPort: 11215
+            name: cb-ssl-xdr2
+          - containerPort: 18091
+            name: cb-admin-ssl
+          - containerPort: 18092
+            name: cb-views-ssl
+          - containerPort: 18093
+            name: cb-queries-ssl
+          - containerPort: 4369
+            name: empd
+          resources:
+            requests:
+              memory: "${MEMORY_LIMIT_INDEX}"
+              cpu: 0.1
+            limits:
+              memory: "${MEMORY_LIMIT_INDEX}"
+          volumeMounts:
+          - mountPath: "/opt/couchbase/var"
+            name: data
+          - mountPath: "/sidecar"
+            name: sidecar
+        - name: couchbase-sidecar
+          image: jetstackexperimental/couchbase-sidecar:0.0.2
+          imagePullPolicy: Always
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          readinessProbe:
+            httpGet:
+              path: "/_status/ready"
+              port: 8080
+            timeoutSeconds: 3
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                - "/couchbase-sidecar"
+                - stop
+          ports:
+          - containerPort: 8080
+            name: sidecar
+          volumeMounts:
+          - mountPath: "/sidecar"
+            name: sidecar
+        volumes:
+        - name: sidecar
+          emptyDir: {}
+        - name: data
+          emptyDir: {}
+parameters:
+- name: NAMESPACE
+  displayName: Namespace
+  description: The OpenShift Namespace where the ImageStream resides.
+  value: openshift
+- name: DATABASE_SERVICE_NAME
+  displayName: Database Service Name
+  description: The name of the OpenShift Service exposed for the database.
+  value: couchbase
+  required: true
+- name: COUCHBASE_USER
+  displayName: Couchbase Connection Username
+  description: Username for Couchbase user that will be used for accessing the database.
+  generate: expression
+  from: user[A-Z0-9]{3}
+  required: true
+- name: COUCHBASE_PASSWORD
+  displayName: Couchbase Connection Password
+  description: Password for the Couchbase connection user.
+  generate: expression
+  from: "[a-zA-Z0-9]{16}"
+  required: true
+- name: COUCHBASE_BUCKET
+  displayName: Couchbase Bucket Name
+  description: Name of the Couchbase database accessed.
+  value: bucket
+  required: true
+- name: IMAGE_NAME
+  value: couchbase/server:enterprise-4.5.1
+  required: true
+- name: REPLICAS_DATA
+  displayName: Desired Pod count for data nodes
+  description: How many data nodes should be provisioned? This value can be changed
+    later, by scaling up/down.
+  value: '3'
+- name: MEMORY_LIMIT_DATA
+  displayName: Memory Limit for data nodes
+  description: Maximum amount of memory data container can use.
+  value: 1Gi
+- name: REPLICAS_INDEX
+  displayName: Desired Pod count for index nodes
+  description: How many index nodes should be provisioned? This value can be changed
+    later, by scaling up/down.
+  value: '3'
+- name: MEMORY_LIMIT_INDEX
+  displayName: Memory Limit for index nodes
+  description: Maximum amount of memory index container can use.
+  value: 1Gi
+- name: REPLICAS_QUERY
+  displayName: Desired Pod count for query nodes
+  description: How many query nodes should be provisioned? This value can be changed
+    later, by scaling up/down.
+  value: '3'
+- name: MEMORY_LIMIT_QUERY
+  displayName: Memory Limit for query nodes
+  description: Maximum amount of memory query container can use.
+  value: 1Gi
+labels:
+  template: couchbase-statefulset-ephemeral-template
